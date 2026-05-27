@@ -8,9 +8,12 @@ class L63Config:
     rho: float = 28.0
     beta: float = 8.0 / 3.0
 
+    # nonlinearity strength
+    alpha: np.ndarray = field(default_factory=lambda: np.arange(0.1, 1.1, 0.1))
+    
     # time stepping
     dt: float = 0.01
-    n_steps: int = 8000
+    n_steps: int = 10000
 
     # observation settings
     obs_every: int = 5
@@ -33,7 +36,7 @@ class L63Config:
     seed: int = 0
 
     # particle filter
-    ensembleN: int = 800
+    ensembleN: int = 1000
 
 cfg = L63Config()
 

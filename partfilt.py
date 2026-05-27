@@ -5,7 +5,7 @@ from config import cfg, rk4
 data = np.load('data/l63_twin.npz')
 rng = np.random.default_rng(cfg.seed)
 
-obs = data['obs']
+obs = data['obs_linear']
 truth = data['truth']
 obs_idx = data['obs_idx']
 
