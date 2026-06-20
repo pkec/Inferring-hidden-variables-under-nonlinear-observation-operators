@@ -1,94 +1,105 @@
 import numpy as np
 from scipy import linalg
-import matplotlib.pyplot as plt
-from config import cfg, rk4
-
-rng = np.random.default_rng(cfg.seed)
+from config import cfg, rk4_vec
 
 
-def EnKF(Af, d, Cdd, M):
-    """Ensemble Kalman Filter (Evensen 2009 eq. 9.27), row-ensemble convention.
+def EnKF(Af, d, Cdd, h, rng):
+    """Stochastic EnKF (Evensen), row-ensemble convention. h applied per member.
         Af:  (Nm, n_state) forecast ensemble, rows are members
         d:   (n_obs,) observation vector
         Cdd: (n_obs, n_obs) observation error covariance
-        M:   (n_obs, n_state) observation operator
+    Returns (analysis ensemble, jensen bias vector).
     """
-    Nm = np.size(Af, 0)
+    Nm = Af.shape[0]
 
-    psi_f_m = np.mean(Af, 0, keepdims=True)    # (1, n_state)
-    Psi_f = Af - psi_f_m                        # (Nm, n_state)
+    psi_f_m = np.mean(Af, 0, keepdims=True)         # (1, n_state) = E[x]
+    D = rng.multivariate_normal(d, Cdd, Nm)         # (Nm, n_obs) perturbed obs
 
-    D = rng.multivariate_normal(d, Cdd, Nm)     # (Nm, n_obs)
+    Y = h(Af)                                       # (Nm, n_obs) = h(x_i), h elementwise
+    Y_e_mean = h(psi_f_m[0])                         # h(E[x])
+    Y_mean = np.mean(Y, axis=0, keepdims=True)       # E[h(x)]
+    S = Y - Y_mean                                   # obs-space anomalies
+    jensen = (Y_mean - Y_e_mean)[0]                  # E[h(x)] - h(E[x])
 
-    Y = np.dot(Af, M.T)                         # (Nm, n_obs)
-    S = np.dot(Psi_f, M.T)                      # (Nm, n_obs)
-
-    C = (Nm - 1) * Cdd + np.dot(S.T, S)        # (n_obs, n_obs)
+    C = (Nm - 1) * Cdd + S.T @ S                     # (n_obs, n_obs)
     Cinv = linalg.inv(C)
 
-    X = np.dot(S, np.dot(Cinv, (D - Y).T))     # (Nm, Nm)
-    Aa = Af + np.dot(X.T, Af)                  # (Nm, n_state)
+    X = S @ (Cinv @ (D - Y).T)                        # (Nm, Nm)
+    Aa = Af + X.T @ Af                                # (Nm, n_state)
 
-    if np.isreal(Aa).all():
-        return Aa
-    else:
-        print('Aa not real')
-        return Af
+    if not np.isreal(Aa).all():
+        print('Aa not real; returning forecast')
+        return Af, jensen
+    return Aa, jensen
+
+
+def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN):
+    """Run EnKF over an assimilation window. Returns dict of per-step arrays."""
+    rng = np.random.default_rng(seed)              # fresh rng per run
+    n_obs = len(obs)
+
+    ensemble = np.tile(truth[0], (N, 1)) \
+        + rng.normal(0, 1, (N, 3)) * cfg.init_std
+
+    en_mean = np.zeros((n_obs, 3))
+    sqerror = np.zeros((n_obs, 3))
+    spread  = np.zeros((n_obs, 3))
+    jensen  = np.zeros((n_obs, 3))
+    truth_at_obs = truth[obs_idx]
+
+    for k in range(n_obs):
+        ensemble += rng.normal(0, 1, (N, 3)) * cfg.perturb_std
+        for _ in range(cfg.obs_every):
+            ensemble = rk4_vec(ensemble, cfg.dt)
+
+        ensemble, js = EnKF(ensemble, obs[k], cfg.R, h, rng)
+
+        jensen[k] = js
+        en_mean[k] = np.mean(ensemble, axis=0)
+        deviation = ensemble - en_mean[k]
+        sqerror[k] = (truth_at_obs[k] - en_mean[k]) ** 2
+        spread[k]  = np.mean(deviation**2, axis=0)
+
+    return dict(en_mean=en_mean, sqerror=sqerror, spread=spread,
+                jensen=jensen, truth_at_obs=truth_at_obs)
 
 
 if __name__ == '__main__':
     data = np.load('data/l63_twin.npz')
-    obs = data['obs_linear']
     truth = data['truth']
     obs_idx = data['obs_idx']
+    obs_linear = data['obs_linear']
+    obs_nonlinear = data['obs_nonlinear']
+    alphas = data['alphas']
 
-    M = np.eye(3)
+    # --- linear run ---
+    h_lin = lambda x: x
+    lin = run_enkf(obs_linear, truth, obs_idx, h_lin)
 
-    ensemble = np.tile(truth[0], (cfg.ensembleN, 1)) \
-        + rng.normal(0, 1, (cfg.ensembleN, 3)) * cfg.init_std
+    # --- nonlinear sweep ---
+    en_mean_nl = np.zeros((len(alphas), len(obs_idx), 3))
+    sqerror_nl = np.zeros_like(en_mean_nl)
+    spread_nl  = np.zeros_like(en_mean_nl)
+    jensen_nl  = np.zeros_like(en_mean_nl)
+    for ai, a in enumerate(alphas):
+        h_nl = lambda x, a=a: x + a * x**2
+        res = run_enkf(obs_nonlinear[ai], truth, obs_idx, h_nl)
+        en_mean_nl[ai] = res['en_mean']
+        sqerror_nl[ai] = res['sqerror']
+        spread_nl[ai]  = res['spread']
+        jensen_nl[ai]  = res['jensen']
 
-    en_mean = np.zeros((len(obs), 3))
-    sqerror = np.zeros((len(obs), 3))
-    spread = np.zeros((len(obs), 3))
-    truth_at_obs = np.zeros((len(obs), 3))
+    np.savez('data/enkf_results.npz',
+             en_mean_linear=lin['en_mean'],
+             sqerror_linear=lin['sqerror'],
+             spread_linear=lin['spread'],
+             jensen_linear=lin['jensen'],
+             truth_at_obs=lin['truth_at_obs'],
+             en_mean_nonlinear=en_mean_nl,
+             sqerror_nonlinear=sqerror_nl,
+             spread_nonlinear=spread_nl,
+             jensen_nonlinear=jensen_nl,
+             alphas=alphas)
 
-    for k in range(len(obs)):
-        for i in range(cfg.ensembleN):
-            for j in range(cfg.obs_every):
-                ensemble[i] = rk4(ensemble[i], cfg.dt)
-            ensemble[i] += rng.normal(0, 1, 3) * cfg.perturb_std
-
-        ensemble = EnKF(ensemble, obs[k], cfg.R, M)
-
-        truth_at_obs[k] = truth[obs_idx[k]]
-        en_mean[k] = np.mean(ensemble, axis=0)
-        deviation = ensemble - en_mean[k]
-        sqerror[k] = (truth_at_obs[k] - en_mean[k]) ** 2
-        spread[k] = np.mean(deviation ** 2, axis=0)
-
-    per_axis_rmse = np.sqrt(np.mean(sqerror, axis=0))
-    per_axis_spread = np.sqrt(np.mean(spread, axis=0))
-    rmse_spread_ratio = per_axis_rmse / per_axis_spread
-
-    print(f"{'':>8}{'x':>10}{'y':>10}{'z':>10}")
-    print(f"{'RMSE':>8}{per_axis_rmse[0]:10.4f}{per_axis_rmse[1]:10.4f}{per_axis_rmse[2]:10.4f}")
-    print(f"{'Spread':>8}{per_axis_spread[0]:10.4f}{per_axis_spread[1]:10.4f}{per_axis_spread[2]:10.4f}")
-    print(f"{'Ratio':>8}{rmse_spread_ratio[0]:10.4f}{rmse_spread_ratio[1]:10.4f}{rmse_spread_ratio[2]:10.4f}")
-
-    time_obs = obs_idx * float(cfg.dt)
-    time_truth = np.arange(len(truth)) * float(cfg.dt)
-    labels = ['x', 'y', 'z']
-
-    fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
-    for i in range(3):
-        axes[i].plot(time_truth, truth[:, i], 'k-', lw=0.8, label='Truth')
-        axes[i].plot(time_obs, obs[:, i], 'r.', ms=3, alpha=0.4, label='Obs')
-        axes[i].plot(time_obs, en_mean[:, i], 'b.', lw=0.5, label='EnKF mean')
-        axes[i].set_ylabel(labels[i])
-        if i == 0:
-            axes[i].legend(loc='upper right', fontsize=9)
-
-    axes[-1].set_xlabel('Time')
-    fig.suptitle(f'EnKF (N={cfg.ensembleN})')
-    plt.tight_layout()
-    plt.show()
+    rmse = np.sqrt(np.mean(lin['sqerror'], axis=0))
+    print(f"EnKF linear RMSE  x={rmse[0]:.3f} y={rmse[1]:.3f} z={rmse[2]:.3f}")
