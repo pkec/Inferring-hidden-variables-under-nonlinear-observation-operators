@@ -26,7 +26,7 @@ class L63Config:
     init_std: np.ndarray = field(default_factory=lambda: np.array([2.0, 2.5, 2.15]))
 
 
-    perturb_std: np.ndarray = field(default_factory=lambda: np.array([0.025, 0.03, 0.025])) #0.25% of obs_std, tuned for flatter PF rank histogram
+    perturb_std: np.ndarray = field(default_factory=lambda: np.array([0.005, 0.00625, 0.005375])) #0.25% of obs_std, tuned for flatter PF rank histogram
     # observation error covariance (diagonal), derived from obs_std
     @property
     def R(self):

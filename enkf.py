@@ -33,8 +33,11 @@ def EnKF(Af, d, Cdd, h, rng):
     return Aa, jensen
 
 
-def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN):
-    """Run EnKF over an assimilation window. Returns dict of per-step arrays."""
+def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
+             save_forecast=True):
+    """Run EnKF over an assimilation window. Returns dict of per-step arrays.
+    save_forecast: also return the forecast (prior) ensemble before each update.
+    """
     rng = np.random.default_rng(seed)              # fresh rng per run
     n_obs = len(obs)
 
@@ -45,12 +48,18 @@ def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN):
     sqerror = np.zeros((n_obs, 3))
     spread  = np.zeros((n_obs, 3))
     jensen  = np.zeros((n_obs, 3))
+    fc_spread = np.zeros((n_obs, 3))               # prior spread, before the update
+    fc_history = np.zeros((n_obs, N, 3)) if save_forecast else None
     truth_at_obs = truth[obs_idx]
 
     for k in range(n_obs):
         ensemble += rng.normal(0, 1, (N, 3)) * cfg.perturb_std
         for _ in range(cfg.obs_every):
             ensemble = rk4_vec(ensemble, cfg.dt)
+
+        fc_spread[k] = ensemble.std(axis=0)        # measured on the prior, before assimilation
+        if save_forecast:
+            fc_history[k] = ensemble.copy()
 
         ensemble, js = EnKF(ensemble, obs[k], cfg.R, h, rng)
 
@@ -61,7 +70,8 @@ def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN):
         spread[k]  = np.mean(deviation**2, axis=0)
 
     return dict(en_mean=en_mean, sqerror=sqerror, spread=spread,
-                jensen=jensen, truth_at_obs=truth_at_obs)
+                jensen=jensen, truth_at_obs=truth_at_obs,
+                fc_spread=fc_spread, fc_history=fc_history)
 
 
 if __name__ == '__main__':
