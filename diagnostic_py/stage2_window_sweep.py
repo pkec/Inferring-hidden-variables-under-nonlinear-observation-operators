@@ -1,8 +1,8 @@
 """
 window_sweep.py — sweep the assimilation window at alpha=0 (linear h), averaged over seeds:
-  figs/fig_window.png       : (a) EnKF vs PF RMSE,  (b) EnKF RMSE excess over PF (per x,y,z)
-  figs/fig_pf_fragility.png : the PF reference collapses without per-window jitter re-tuning
-  figs/fig_mechanism.png    : the forecast prior spreads and deforms away from Gaussian (xy, xz, yz)
+  figs/diagnostic/fig_window.png       : (a) EnKF vs PF RMSE,  (b) EnKF RMSE excess over PF (per x,y,z)
+  figs/diagnostic/fig_pf_fragility.png : the PF reference collapses without per-window jitter re-tuning
+  figs/diagnostic/fig_mechanism.png    : the forecast prior spreads and deforms away from Gaussian (xy, xz, yz)
 Run from the project folder (same place as run.py). Needs the save_forecast option in enkf.py.
 """
 import os
@@ -10,11 +10,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 from config import cfg, rk4
 from partfilt import run_pf
 from enkf import run_enkf
 
-os.makedirs('figs', exist_ok=True)
+# ============================================================
+# CHANGELOG  (newest first; version = stage.patch)
+# 3.16 Changed: figs output -> figs/diagnostic (the window sweep itself is this script's purpose,
+#      so the swept window list is unchanged);  Added: sys.path bootstrap for diagnostic_py/
+# ============================================================
+
+os.makedirs('figs/diagnostic', exist_ok=True)
 
 windows = [5, 10, 15, 20, 25]                  # obs_every values (window = obs_every * cfg.dt)
 seeds = list(range(3))                          # noise realizations to average over (more = smoother, slower)
@@ -111,7 +119,7 @@ a2.set_xticks(w); a2.set_xlabel('assimilation window  (steps between updates)')
 a2.set_ylabel('EnKF RMSE excess over PF  (%)'); a2.set_title('(b) EnKF excess over PF', pad=30)
 a2.secondary_xaxis('top', functions=(lambda v: v * cfg.dt, lambda v: v / cfg.dt)).set_xlabel('observation interval  Δt')
 a2.legend(); a2.grid(alpha=0.3)
-fig.tight_layout(); fig.savefig('figs/fig_window.png', dpi=145)
+fig.tight_layout(); fig.savefig('figs/diagnostic/fig_window.png', dpi=145)
 
 # ---------- figure 2: PF fragility ----------
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.6))
@@ -133,7 +141,7 @@ a2.set_xticks(w); a2.set_xlabel('assimilation window  (steps between updates)')
 a2.set_ylabel('PF RMSE / spread  (re-tuned)')
 a2.set_title('(b) Re-tuned PF calibration')
 a2.legend(loc='best'); a2.grid(alpha=0.3)
-fig.tight_layout(); fig.savefig('figs/fig_pf_fragility.png', dpi=145)
+fig.tight_layout(); fig.savefig('figs/diagnostic/fig_pf_fragility.png', dpi=145)
 
 # ---------- figure 3: mechanism (prior spread + xy/xz/yz scatters) ----------
 planes = [(0, 1, 'x', 'y'), (0, 2, 'x', 'z'), (1, 2, 'y', 'z')]
@@ -163,8 +171,8 @@ for col, (i, j, xl, yl) in enumerate(planes):
     a5.set_title(f'window=5  ({xl}–{yl})', fontsize=9)
     a25.set_title(f'window=25  ({xl}–{yl})', fontsize=9)
     a5.set_xlabel(xl); a5.set_ylabel(yl); a25.set_xlabel(xl); a25.set_ylabel(yl)
-fig.tight_layout(); fig.savefig('figs/fig_mechanism.png', dpi=145)
+fig.tight_layout(); fig.savefig('figs/diagnostic/fig_mechanism.png', dpi=145)
 
-print('saved figs/fig_window.png, figs/fig_pf_fragility.png, figs/fig_mechanism.png')
+print('saved figs/diagnostic/fig_window.png, figs/diagnostic/fig_pf_fragility.png, figs/diagnostic/fig_mechanism.png')
 print('PF jitter multiple (averaged over seeds):', dict(zip(windows, np.round(pf_mult, 2))))
 print('re-tuned PF RMSE/spread (target 1 ± 0.05):', dict(zip(windows, np.round(pf_ratio, 3))))

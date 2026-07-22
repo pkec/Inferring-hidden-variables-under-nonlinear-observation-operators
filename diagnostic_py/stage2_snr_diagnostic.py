@@ -2,14 +2,22 @@
 snr_diagnostic.py — show why fixed_R conflates curvature with information gain.
 Operates on the truth trajectory only (no filtering), so it's cheap and noise-model-agnostic:
 it just asks how informative an observation is at each alpha under each noise model.
-Produces figs/snr_diagnostic.png.
+Produces figs/diagnostic/snr_diagnostic.png.
 """
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 from config import cfg
 
-os.makedirs('figs', exist_ok=True)
+# ============================================================
+# CHANGELOG  (newest first; version = stage.patch)
+# 3.16 Changed: figs output -> figs/diagnostic (script is noise-model-agnostic by design — it
+#      contrasts fixed_R vs fixed_snr, so nothing to commit here);  Added: sys.path bootstrap
+# ============================================================
+
+os.makedirs('figs/diagnostic', exist_ok=True)
 data = np.load('data/l63_twin.npz')
 truth = data['truth']; obs_idx = data['obs_idx']; alphas = data['alphas']
 
@@ -42,7 +50,7 @@ for a in ax:
     a.grid(alpha=0.3)
 fig.suptitle('Why fixed_R conflates two effects: curvature rises AND observations get more informative', y=1.02)
 fig.tight_layout()
-fig.savefig('figs/snr_diagnostic.png', dpi=145, bbox_inches='tight')
+fig.savefig('figs/diagnostic/snr_diagnostic.png', dpi=145, bbox_inches='tight')
 print(f"fixed_R SNR: {snr_fixedR[0]:.1f} -> {snr_fixedR[-1]:.1f}  ({snr_fixedR[-1]/snr_fixedR[0]:.1f}x)")
 print(f"fixed_snr SNR: {snr_fixedsnr[0]:.1f} -> {snr_fixedsnr[-1]:.1f}  (flat by construction)")
-print('saved figs/snr_diagnostic.png')
+print('saved figs/diagnostic/snr_diagnostic.png')

@@ -7,13 +7,15 @@ from enkf import run_enkf
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 3.16 Changed: figs -> figs/results; windows defaults to [15] (headline commit; re-add [5, 15]
+#      for the writeup window comparison)
 # 2.10 Changed: self-contained + consolidated — each Stage 1 figure is one PNG with both
 #               windows as panels (traces 3x2, rmse/spread 2x2, rank-hist 2x3); no per-window files
-# 2.9  Changed: window-aware — figures tagged _w{obs_every}, titles show the window; ensure figs/ exists
+# 2.9  Changed: window-aware — figures tagged _w{obs_every}, titles show the window; ensure figs/results/ exists
 # ============================================================
 
-os.makedirs('figs', exist_ok=True)
-windows = [5, 15]                          # each window gets its own column/row of panels
+os.makedirs('figs/results', exist_ok=True)
+windows = [15]                             # committed headline window; use [5, 15] for the writeup window comparison
 labels = ['x', 'y', 'z']
 h = lambda x: x                            # linear observation operator (Stage 1 baseline)
 
@@ -62,7 +64,7 @@ for ci, W in enumerate(windows):
         if ri == 0 and ci == 0: ax.legend(loc='upper right', fontsize=8)
     axes[2, ci].set_xlabel('Time')
 fig.suptitle('Stage 1: PF vs EnKF, linear h')
-fig.tight_layout(); fig.savefig('figs/stage1_traces.png', dpi=130)
+fig.tight_layout(); fig.savefig('figs/results/stage1_traces.png', dpi=130)
 
 
 # ---- Figure 2: RMSE & spread bars (rows RMSE/spread  x  cols = window) ----
@@ -79,7 +81,7 @@ for ci, W in enumerate(windows):
     a1.set_xticks(x); a1.set_xticklabels(labels); a1.set_title(f'window {W} — spread')
     if ci == 0: a0.legend(); a1.legend()
 fig.suptitle('Stage 1: RMSE & spread agreement, linear h')
-fig.tight_layout(); fig.savefig('figs/stage1_rmse_spread.png', dpi=130)
+fig.tight_layout(); fig.savefig('figs/results/stage1_rmse_spread.png', dpi=130)
 
 
 # ---- Figure 3: PF rank histograms (rows = window  x  cols x,y,z) ----
@@ -99,6 +101,6 @@ for ri, W in enumerate(windows):
         if v == 0 and ri == 0: ax.legend()
     axes[ri, 0].set_ylabel(f'window {W}\ncount')
 fig.suptitle('Stage 1: PF rank histograms, linear h')
-fig.tight_layout(); fig.savefig('figs/stage1_rank_hist.png', dpi=130)
+fig.tight_layout(); fig.savefig('figs/results/stage1_rank_hist.png', dpi=130)
 
-print("\nsaved figs/stage1_traces.png, figs/stage1_rmse_spread.png, figs/stage1_rank_hist.png")
+print("\nsaved figs/results/stage1_traces.png, figs/results/stage1_rmse_spread.png, figs/results/stage1_rank_hist.png")

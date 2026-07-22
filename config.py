@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 2.14 Added: seeds list (default [0,1,2]) + env override L63_SEEDS, for Stage 2 seed-averaging
 # 2.9  Changed: per-window baselines named W5_PERTURB_STD / W15_PERTURB_STD; verified each
 #               gives a flat alpha=0 PF rank histogram (seed-avg spread/RMSE ~1.0) so 'fixed'
 #               jitter uses them as-is
@@ -64,7 +65,7 @@ class L63Config:
 
     # noise model: 'fixed_R' = fixed absolute sensor std (physical default);
     # 'fixed_snr' = noise std scaled with std(h_alpha(truth)) to hold SNR constant (curvature-isolating control)
-    noise_mode: str = 'fixed_R'
+    noise_mode: str = 'fixed_snr'
 
     # jitter strategy: 'variable' = per-alpha calibration; 'fixed' = clamp at the alpha=0 value
     jitter_mode: str = 'variable'
@@ -83,7 +84,8 @@ class L63Config:
         return np.diag(self.obs_std ** 2)
 
     # reproducibility
-    seed: int = 0
+    seed: int = 0                                              # single-seed default (Stage 1, diagnostics)
+    seeds: list = field(default_factory=lambda: [0, 1, 2])    # Stage 2 seed-averaging set
 
     # particle filter
     ensembleN: int = 1000
@@ -104,6 +106,8 @@ if 'L63_NOISE_MODE' in os.environ:
     cfg.noise_mode = os.environ['L63_NOISE_MODE']
 if 'L63_JITTER_MODE' in os.environ:
     cfg.jitter_mode = os.environ['L63_JITTER_MODE']
+if 'L63_SEEDS' in os.environ:
+    cfg.seeds = [int(x) for x in os.environ['L63_SEEDS'].split(',')]   # e.g. L63_SEEDS=0,1,2
 if cfg.obs_every in PERTURB_BY_WINDOW:
     cfg.perturb_std = PERTURB_BY_WINDOW[cfg.obs_every]
 

@@ -10,16 +10,20 @@ jitter. Self-contained (builds its own truth, same recipe as truth_obs.py).
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 from config import cfg, rk4, PERTURB_BY_WINDOW
 from enkf import run_enkf
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 3.16 Changed: figs -> figs/diagnostic; windows defaults to [15] (committed; re-add [5, 15] for the writeup);
+#      Added:   sys.path bootstrap for diagnostic_py/
 # 2.13 created — EnKF covariance-trace collapse diagnostic (forecast/analysis trace vs obs error & climatology)
 # ============================================================
 
-os.makedirs('figs', exist_ok=True)
-windows = [5, 15]
+os.makedirs('figs/diagnostic', exist_ok=True)
+windows = [15]      # committed headline window; use [5, 15] to reproduce the window comparison for the writeup
 h = lambda x: x                               # linear baseline
 
 s = np.array([1.0, 1.0, 1.0])                 # truth, same recipe as truth_obs.py
@@ -46,7 +50,6 @@ for ax, W in zip(axes, windows):
     ax.semilogy(t, tr_f, color='#e67e22', lw=0.7, alpha=0.85, label='forecast trace')
     ax.semilogy(t, tr_a, color='#c0392b', lw=0.7, alpha=0.85, label='analysis trace')
     ax.axhline(tr_R, ls='--', color='#2471a3', lw=1.4, label=f'obs error tr(R) = {tr_R:.1f}')
-    ax.axhline(tr_clim, ls='--', color='#555', lw=1.4, label=f'climatology = {tr_clim:.0f}')
     ax.set_xlabel('time'); ax.set_title(f'window {W}   ($\\Delta t$ = {W*cfg.dt:.2f})')
     ax.grid(alpha=0.3, which='both')
 
@@ -60,6 +63,6 @@ for ax, W in zip(axes, windows):
 
 axes[0].set_ylabel('covariance trace (sum of variances)')
 axes[0].legend(loc='lower right', fontsize=8)
-fig.suptitle('EnKF covariance trace vs observation error and climatology (linear h)')
-fig.tight_layout(); fig.savefig('figs/trace_collapse.png', dpi=145)
-print('saved figs/trace_collapse.png')
+fig.suptitle('EnKF covariance trace vs observation error (linear h)')
+fig.tight_layout(); fig.savefig('figs/diagnostic/trace_collapse.png', dpi=145)
+print('saved figs/diagnostic/trace_collapse.png')
