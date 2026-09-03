@@ -1,22 +1,5 @@
-"""
-run.py — project pipeline, one click.
-Stage 1 baseline (linear h) runs once. Stage 2/3 then run a single headline config:
-window 15, fixed_snr noise, variable jitter (set via the env vars config.py reads,
-so nothing edits config.py). Each script is a fresh process, so cfg state never leaks.
-The Stage 3 quadratic-regression EnKF is computed inside error_sweep.py; Stage 2 and Stage 3
-error panels are separate PNGs (stage2_results.py has no QR line; stage3_results.py overlays it).
 
-Outputs:
-  figs/results/stage1_traces.png / stage1_rmse_spread.png / stage1_rank_hist.png   (Stage 1)
-  data/stage2_results_w15_fixed_snr_variable.npz
-  figs/results/stage2_errors_w15.png   (1x3: Jensen, cross-cov, RMSE excess — standard EnKF)
-  figs/results/stage3_errors_qr_w15.png    (EnKF vs quad-reg EnKF)
-  figs/results/stage3_errors_ie_w15.png    (EnKF vs iterative EnKF)
-  figs/results/stage3_errors_qrie_w15.png  (quad-reg vs iterative EnKF)
-  figs/results/stage3_errors_w15.png       (all three overlaid)
-  figs/diagnostic/calibration_ratio_w15.png   (spread/RMSE ratio, all four filters)
-  figs/diagnostic/spread_rmse_w15.png         (spread & RMSE split, all four filters)
-"""
+# i abandoned this because i just ran everything individually instead - NK
 import os
 import subprocess
 

@@ -1,25 +1,69 @@
-"""
-calibration_ratio.py — spread/RMSE ratio vs alpha for the current config, all four filters
-(EnKF, PF, quad-reg EnKF, iterative EnKF). ratio=1 is well calibrated; <1 under-dispersed
-(overconfident, e.g. a collapsed ensemble); >1 over-dispersed. A ratio far from 1 flags a filter
-that isn't running healthily even where its RMSE looks acceptable. Reads
-data/stage2_results_w{W}_{mode}_{jitter}.npz.
-"""
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
+import figstyle as fs
+if getattr(fs, 'VERSION', (0, 0)) < (5, 29):      # stale copy on the path?
+    raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
+                     f'the current version and delete any __pycache__ beside it')
 from config import cfg
+
+fs.use()
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 5.45 Changed: labels, ticks and legend text scale by LABEL_SCALE, so the exported PNG reads
+#      at the same size as stage4_excess_gap_alpha — the model figure — which prints at
+#      0.5\textwidth against this figure's 0.72.
+#      Changed: legend ncol is chosen from the number of KEYS drawn, not the number of series.
+#      The target band contributes a key too, so ncol=len(series) put 4 entries on the first
+#      row and left the fifth stranded on a row of its own.
+# 5.28 Changed: legend moved above the axes via fs.leg_above, and series labels shortened to
+#      QR-EnKF / IEnKF to match the write-up and stage3_results.py.
+# 5.25 Changed: sizing and fonts now come from figstyle.py. Figures are exported at the
+#      width they are PRINTED at, so \includegraphics scales by 1.0 and the point sizes
+#      are what lands on the page — 9pt labels, 8pt ticks, 7.5pt legends, matching every
+#      other report figure. The 8in figure shrank by 0.60 at 0.72\textwidth, taking the
+#      8pt legend to 4.8pt. Literal fontname/fontsize arguments replaced by figstyle.
+# 5.3  Changed: two PNGs (EnKF vs QR vs PF, EnKF vs IEnKF vs PF) via a make() helper, so each
+#               remedy is read against the EnKF/PF pair without the other remedy's line on top
+#      Removed: the single four-filter panel (calibration_ratio_w{W}.png)
 # 3.16 Changed: figs output -> figs/diagnostic;  Added: sys.path bootstrap so project modules import when run from diagnostic_py/
 # 3.8  Changed: single-config single panel (was 2x2 mode x jitter); added quad-reg and iterative
 #               EnKF ratio lines alongside EnKF/PF to flag mis-calibration/collapse of each remedy
 # 2.14 Added: +/-1 std (across seeds) shaded band on the ratio curves
 # 2.5  created — spread/RMSE vs alpha
 # ============================================================
+
+# ---- label / legend sizing ---------------------------------------------------------------
+# Model figure: stage4_excess_gap_alpha. It prints at 0.5\textwidth, so at a common 9pt its
+# labels fill more of the exported PNG than this 0.72 figure does. LABEL_SCALE multiplies
+# every figstyle point size — labels, ticks and legend alike — so the two match on screen.
+# Set it to 1.0 to go back to plain figstyle sizes (9pt/8pt/7.5pt on the page).
+LABEL_SCALE = 1.4
+
+def scaled(kw, s=None):
+
+    s = LABEL_SCALE if s is None else s
+    out = dict(kw)
+    for k in ('fontsize', 'size'):
+        if isinstance(out.get(k), (int, float)):
+            out[k] = out[k] * s
+    p = out.get('prop')
+    if isinstance(p, dict):
+        q = dict(p)
+        if isinstance(q.get('size'), (int, float)):
+            q['size'] = q['size'] * s
+        out['prop'] = q
+    elif p is not None and hasattr(p, 'get_size'):        # a FontProperties instance
+        q = p.copy(); q.set_size(p.get_size() * s); out['prop'] = q
+    return out
+
+LAB = scaled(fs.LAB)
+_tk = plt.rcParams['xtick.labelsize']                     # figstyle sets this in fs.use()
+TICKSIZE = (_tk if isinstance(_tk, (int, float)) else 8) * LABEL_SCALE
 
 os.makedirs('figs/diagnostic', exist_ok=True)
 W, mode, jit = cfg.obs_every, cfg.noise_mode, cfg.jitter_mode
@@ -30,25 +74,35 @@ if not os.path.exists(f):
 d = np.load(f); a = d['alphas']
 sd = lambda k: d[k] if k in d.files else np.zeros_like(a)
 
-# (label, colour, marker, ratio key)
-filters = [
-    ('EnKF',           '#c0392b', 'o-', 'en_ratio'),
-    ('PF (reference)', '#2471a3', 's-', 'pf_ratio'),
-    ('quad-reg EnKF',  '#e67e22', 'D-', 'qr_ratio'),
-    ('iterative EnKF', '#16a085', '^-', 'ie_ratio'),
-]
+# each filter: (label, colour, marker, ratio key)
+ENKF = ('EnKF',            '#c0392b', 'o-', 'en_ratio')
+PF   = ('PF (reference)',  '#16a085', 's-', 'pf_ratio')
+QR   = ('QR-EnKF',         '#e67e22', 'D-', 'qr_ratio')
+IE   = ('IEnKF',           '#2471a3', '^-', 'ie_ratio')
 
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.axhspan(0.95, 1.05, color='green', alpha=0.10, label='target 1 ± 0.05')
-ax.axhline(1, ls='--', color='k', lw=1)
-for label, col, mk, kr in filters:
-    if kr not in d.files:
-        continue
-    ax.plot(a, d[kr], mk, color=col, lw=2, label=label)
-    ax.fill_between(a, d[kr] - sd(kr + '_std'), d[kr] + sd(kr + '_std'), color=col, alpha=0.15)
-ax.set_xlabel(r'$\alpha$'); ax.set_ylabel('spread / RMSE  (calibrated)')
-ax.set_title(f'Calibration quality vs nonlinearity — window {W}, {mode}, {jit} jitter')
-ax.grid(alpha=0.3); ax.legend(loc='best', fontsize=8)
-fig.tight_layout()
-fig.savefig(f'figs/diagnostic/calibration_ratio_w{W}.png', dpi=145, bbox_inches='tight')
-print(f'saved figs/diagnostic/calibration_ratio_w{W}.png')
+def make(series, suffix, title):
+    fig, ax = plt.subplots(figsize=fs.size(0.72))
+    ax.axhspan(0.95, 1.05, color='green', alpha=0.10, label='target 1 ± 0.05')
+    ax.axhline(1, ls='--', color='k', lw=1)
+    for label, col, mk, kr in series:
+        if kr not in d.files:
+            continue                                    # remedy absent from this npz
+        ax.plot(a, d[kr], mk, color=col, lw=2, label=label)
+        ax.fill_between(a, d[kr] - sd(kr + '_std'), d[kr] + sd(kr + '_std'), color=col, alpha=0.15)
+    ax.set_xlabel(r'$\alpha$', **LAB); ax.set_ylabel('spread / RMSE', **LAB)
+    ax.tick_params(labelsize=TICKSIZE)
+    #ax.set_title(f'Calibration quality vs nonlinearity — {title}\n'
+    #             f'window {W}, {mode}, {jit} jitter')
+    ax.grid(alpha=0.3)
+    # ncol from the KEYS actually drawn (the target band contributes one), split into two
+    # roughly equal rows — 5 keys at ncol=5 wrapped 4+1, which reads as a mistake.
+    nkeys = 1 + len([x for x in series if x[3] in d.files])
+    ax.legend(**scaled(fs.leg_above(ncol=(nkeys + 1) // 2)))
+    fig.tight_layout()
+    out = f'figs/diagnostic/calibration_ratio_{suffix}w{W}.png'
+    fig.savefig(out, dpi=fs.DPI, bbox_inches='tight'); plt.close(fig)
+    print(f'saved {out}')
+
+make([ENKF, QR, PF], 'qr_', 'quad-reg EnKF')
+make([ENKF, IE, PF], 'ie_', 'iterative EnKF')
+make([ENKF, QR, PF, IE], '', 'All')

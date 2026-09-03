@@ -7,6 +7,8 @@ from enkf import run_enkf
 from enkf_qr import run_enkf_qr
 from enkf_ienkf import run_enkf_ienkf
 
+# also outdated - wasnt really used
+
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 3.16 Added:   os.makedirs for the output directory

@@ -4,6 +4,10 @@ from config import cfg, rk4_vec
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 4.41 Added: divergence guard — a non-finite or off-attractor ensemble stops the run and
+#      is reported as diverged_at, with the tail NaN-filled, instead of letting the next
+#      window's RK4 overflow and crash the analysis. At N=100 the QR variant hit this at
+#      alpha=0.1 under high jitter; same guard everywhere so the three variants agree.
 # 2.0  Stage 2 — nonlinear-h support
 #   Added:   obs_std arg + local R, so each run uses its own per-alpha noise
 #   Added:   forecast cross-covariance Cov(x, h(x)) returned as 'cross'
@@ -12,12 +16,7 @@ from config import cfg, rk4_vec
 
 
 def EnKF(Af, d, Cdd, h, rng):
-    """Stochastic EnKF (Evensen), row-ensemble convention. h applied per member.
-        Af:  (Nm, n_state) forecast ensemble, rows are members
-        d:   (n_obs,) observation vector
-        Cdd: (n_obs, n_obs) observation error covariance
-    Returns (analysis ensemble, jensen bias vector, forecast cross-covariance).
-    """
+
     Nm = Af.shape[0]
 
     psi_f_m = np.mean(Af, 0, keepdims=True)         # (1, n_state) = E[x]
@@ -45,10 +44,7 @@ def EnKF(Af, d, Cdd, h, rng):
 
 def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
              obs_std=None, save_forecast=True):
-    """Run EnKF over an assimilation window. Returns dict of per-step arrays.
-    obs_std: per-component observation noise std (defaults to cfg.obs_std).
-    save_forecast: also return the forecast (prior) ensemble before each update.
-    """
+
     rng = np.random.default_rng(seed)              # fresh rng per run
     n_obs = len(obs)
     obs_std = cfg.obs_std if obs_std is None else obs_std
@@ -65,11 +61,24 @@ def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
     fc_spread = np.zeros((n_obs, 3))               # prior spread, before the update
     fc_history = np.zeros((n_obs, N, 3)) if save_forecast else None
     truth_at_obs = truth[obs_idx]
+    diverged_at = None                             # cycle where the run left the attractor, or None
+    BLOWUP = 1e3                                   # |state| far beyond the L63 attractor (~|x|<50)
 
     for k in range(n_obs):
         ensemble += rng.normal(0, 1, (N, 3)) * cfg.perturb_std
-        for _ in range(cfg.obs_every):
-            ensemble = rk4_vec(ensemble, cfg.dt)
+        # overflow here is expected once the state has left the attractor; the guard below
+        # catches it, so the warnings are noise rather than information
+        with np.errstate(over='ignore', invalid='ignore'):
+            for _ in range(cfg.obs_every):
+                ensemble = rk4_vec(ensemble, cfg.dt)
+
+        # Divergence guard, AFTER propagation and BEFORE the analysis: this is where a
+        # blown-up state actually becomes inf/NaN. The Lorenz terms are quadratic (x*y, x*z),
+        # so an ensemble that is merely large at the end of one cycle overflows inside the
+        # next window's RK4 steps, and the analysis then fails on a non-finite matrix.
+        if not np.isfinite(ensemble).all() or np.abs(ensemble).max() > BLOWUP:
+            diverged_at = k
+            break
 
         fc_spread[k] = ensemble.std(axis=0)        # measured on the prior, before assimilation
         if save_forecast:
@@ -84,9 +93,17 @@ def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
         sqerror[k] = (truth_at_obs[k] - en_mean[k]) ** 2
         spread[k]  = np.mean(deviation**2, axis=0)
 
+    if diverged_at is not None:                    # tail was never written; mark it unusable
+        for arr in (en_mean, sqerror, spread, jensen, fc_spread):
+            arr[diverged_at:] = np.nan
+        cross[diverged_at:] = np.nan
+        if save_forecast:
+            fc_history[diverged_at:] = np.nan
+
     return dict(en_mean=en_mean, sqerror=sqerror, spread=spread,
                 jensen=jensen, cross=cross, truth_at_obs=truth_at_obs,
-                fc_spread=fc_spread, fc_history=fc_history)
+                fc_spread=fc_spread, fc_history=fc_history,
+                diverged_at=diverged_at)
 
 
 if __name__ == '__main__':

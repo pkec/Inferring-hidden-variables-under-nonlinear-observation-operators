@@ -3,6 +3,8 @@ from config import cfg, rk4_vec
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 4.38 Changed: N defaults to cfg.particleN, not cfg.ensembleN — the PF keeps its 1000
+#      particles while the EnKF family drops to 100
 # 2.0  Stage 2 — nonlinear-h support
 #   Added:   obs_std arg + local R_diag, so each run uses its own per-alpha noise
 #   Added:   forecast cross-covariance Cov(x, h(x)) returned as 'cross'
@@ -10,14 +12,8 @@ from config import cfg, rk4_vec
 # ============================================================
 
 
-def run_pf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
+def run_pf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.particleN,
            obs_std=None, save_particles=False):
-    """Bootstrap particle filter with systematic resampling.
-        obs:     (n_obs, 3) observations
-        h:       observation operator, applied to particles
-        obs_std: per-component observation noise std (defaults to cfg.obs_std).
-    Returns dict of per-step arrays.
-    """
     rng = np.random.default_rng(seed)          # fresh rng per run -> reproducible
     obs_std = cfg.obs_std if obs_std is None else obs_std
     R_diag = obs_std ** 2

@@ -4,6 +4,24 @@ from dataclasses import dataclass, field
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
+# 5.47 Added: fc_var_comp — per-component FORECAST variance, from out['fc_spread']. The
+#      delta = alpha * s^2 argument is about the prior ensemble, but the only spread saved
+#      anywhere was the ANALYSIS spread, which the update has already contracted. Keeping
+#      the two named apart here stops one being quoted for the other.
+# 5.44 Added: rmse_comp / spread_comp / cal_ratio — the ONE definition of the calibration
+#      ratio for the whole project, plus CAL_RATIO_CONVENTION to stamp into every npz.
+#      Three scripts had three different formulas for "spread/RMSE" (stage1 per component,
+#      error_sweep pooled over cycles AND components, stage2_hbar per component then
+#      averaged), so the same filter reported three different numbers at alpha=0. The
+#      definition now lives here, beside rk4, and every script imports it.
+#      Added: PERTURB_BASELINE_ALPHA — the alpha at which the per-window baseline jitter
+#      was tuned (0.0). Scripts read it instead of hard-coding "if a == 0", so the rule
+#      "baseline at the tuning point, scanned multipliers away from it" is stated once.
+# 4.40 Added: blind_seeds (default [100,101,102]) + env override L63_BLIND_SEEDS — the runs
+#      the blind RLS fits its frozen weights on; set to a single seed to train on one
+#      trajectory
+# 4.38 Changed: ensembleN 1000 -> 100 and now means the EnKF family only; new particleN=1000
+#      for the PF. One shared size made the two filters look equally expensive.
 # 2.14 Added: seeds list (default [0,1,2]) + env override L63_SEEDS, for Stage 2 seed-averaging
 # 2.9  Changed: per-window baselines named W5_PERTURB_STD / W15_PERTURB_STD; verified each
 #               gives a flat alpha=0 PF rank histogram (seed-avg spread/RMSE ~1.0) so 'fixed'
@@ -28,7 +46,9 @@ from dataclasses import dataclass, field
 #                              isolating curvature (use for the headline Stage 2 fig).
 #
 #   jitter_mode  'variable' : per-alpha jitter calibration (scan multiples of the window
-#                             baseline for spread/RMSE -> 1 at each alpha).
+#                             baseline for spread/RMSE -> 1 at each alpha) for alpha > 0;
+#                             at alpha = 0 the baseline is used as-is, because that is the
+#                             alpha it was tuned at — see PERTURB_BASELINE_ALPHA.
 #                'fixed'    : use the window baseline jitter as-is (no multiplier) for all
 #                             alpha — lets the ratio drift so the calibration loss is measured.
 #
@@ -36,7 +56,8 @@ from dataclasses import dataclass, field
 #   obs_every    steps between observations (assimilation window). 5 = dense, larger = harder.
 #                Auto-selects perturb_std via PERTURB_BY_WINDOW below.
 #   n_steps      truth trajectory length. Longer = smoother statistics, slower.
-#   ensembleN    number of ensemble members / particles.
+#   ensembleN    EnKF-family ensemble size (EnKF, QR-EnKF, IEnKF, rls_inject).
+#   particleN    bootstrap PF particle count; independent of ensembleN.
 #   seed         RNG seed. Vary it to seed-average (error bars on the Stage 2 figure).
 #   obs_std      per-axis sensor noise std; sets R and the effective SNR at alpha=0.
 #   perturb_std  base ensemble jitter, set automatically from obs_every (PERTURB_BY_WINDOW);
@@ -55,7 +76,7 @@ class L63Config:
 
     # nonlinearity strength; alpha=0 is the linear baseline h(x)=x
     alpha: np.ndarray = field(default_factory=lambda: np.round(np.arange(0.0, 1.01, 0.1), 2))
-    
+
     # time stepping
     dt: float = 0.01
     n_steps: int = 10000
@@ -86,9 +107,13 @@ class L63Config:
     # reproducibility
     seed: int = 0                                              # single-seed default (Stage 1, diagnostics)
     seeds: list = field(default_factory=lambda: [0, 1, 2])    # Stage 2 seed-averaging set
+    blind_seeds: list = field(default_factory=lambda: [100, 101, 102])  # blind RLS training set
 
-    # particle filter
-    ensembleN: int = 1000
+    # ensemble sizes, set independently. The EnKF family needs far fewer members than the
+    # PF on a 3-variable state; running both at 1000 hid that, and every cost figure came
+    # out as if the PF were free.
+    ensembleN: int = 300      # EnKF, QR-EnKF, IEnKF, rls_inject
+    particleN: int = 1000     # bootstrap PF (the benchmark)
 
 cfg = L63Config()
 
@@ -99,6 +124,12 @@ W5_PERTURB_STD  = np.array([0.005, 0.00625, 0.005375])   # window 5  (0.25% of o
 W15_PERTURB_STD = np.array([0.02,  0.025,   0.0215])     # window 15 (1% of obs_std)
 PERTURB_BY_WINDOW = {5: W5_PERTURB_STD, 15: W15_PERTURB_STD}
 
+# The alpha these baselines were tuned at. At this alpha the sweep uses the baseline as-is
+# (multiplier 1.0, no scan), because scanning would re-tune a filter that is already
+# calibrated here — and would then disagree with Stage 1, which has no scan at all. Away
+# from it the operator curves, the baseline is no longer the right jitter, and the scan runs.
+PERTURB_BASELINE_ALPHA = 0.0
+
 # run.py drives the (window x noise_mode) matrix through these env vars; fall back to the defaults above
 if 'L63_OBS_EVERY' in os.environ:
     cfg.obs_every = int(os.environ['L63_OBS_EVERY'])
@@ -108,6 +139,8 @@ if 'L63_JITTER_MODE' in os.environ:
     cfg.jitter_mode = os.environ['L63_JITTER_MODE']
 if 'L63_SEEDS' in os.environ:
     cfg.seeds = [int(x) for x in os.environ['L63_SEEDS'].split(',')]   # e.g. L63_SEEDS=0,1,2
+if 'L63_BLIND_SEEDS' in os.environ:
+    cfg.blind_seeds = [int(x) for x in os.environ['L63_BLIND_SEEDS'].split(',')]  # e.g. =100
 if cfg.obs_every in PERTURB_BY_WINDOW:
     cfg.perturb_std = PERTURB_BY_WINDOW[cfg.obs_every]
 
@@ -146,3 +179,45 @@ def rk4_vec(S, dt):
     k3 = lorenz63_vec(S + 0.5 * dt * k2)
     k4 = lorenz63_vec(S + dt * k3)
     return S + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
+
+
+
+
+CAL_RATIO_CONVENTION = (
+    'calibration ratio = mean over x, y, z of (spread_i / RMSE_i), with '
+    'RMSE_i = sqrt(mean_k sqerror[k,i]) and spread_i = sqrt(mean_k spread[k,i]); '
+    'formed within a single seed, then averaged over seeds. No pooled variant is saved.'
+)
+
+
+def rmse_comp(out):
+
+    return np.sqrt(np.asarray(out['sqerror']).mean(0))
+
+
+def spread_comp(out):
+
+    return np.sqrt(np.asarray(out['spread']).mean(0))
+
+
+def cal_ratio_comp(out):
+
+    return spread_comp(out) / rmse_comp(out)
+
+
+def cal_ratio(out):
+
+    return float(cal_ratio_comp(out).mean())
+
+
+def fc_var_comp(out):
+
+    fc = out.get('fc_spread') if hasattr(out, 'get') else None
+    if fc is None:
+        return None
+    return np.nanmean(np.asarray(fc) ** 2, axis=0)
+
+
+def cal_gap(out):
+
+    return abs(cal_ratio(out) - 1.0)
