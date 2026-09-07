@@ -1,0 +1,1 @@
+This is the code which was used for the Imperial MSc Advanced Aeronautical Engineering Major Individual Research Project. The code includes implementation of the particle filter, ensemble Kalman filter (EnKF), quadratic regression EnKF (QR-EnKF), Iterative EnKF (IEnKF) and the Recursive least squares (RLS), deployed in the Lorenz-63 system.
