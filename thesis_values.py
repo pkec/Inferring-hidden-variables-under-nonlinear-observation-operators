@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.44 created — reads every thesis-quoted number out of the persisted npz files and writes
@@ -49,14 +47,12 @@ BLIND_HI = 0.6
 # row results
 # ---------------------------------------------------------------------------------------
 def ok(values, unit, source, how, seeds=None):
-
     v = np.asarray(values, dtype=float)
     return dict(values=v, unit=unit, source=source, how=how,
                 seeds=list(seeds) if seeds is not None else None)
 
 
 def missing(what, how=''):
-
     return dict(values=None, unit='', source=f'MISSING: {what}', how=how, seeds=None)
 
 
@@ -77,7 +73,6 @@ def need(path):
 
 
 def alpha_index(d, a):
-
     al = np.asarray(d['alphas'], dtype=float)
     i = int(np.argmin(np.abs(al - a)))
     if abs(float(al[i]) - a) > 1e-9:
@@ -86,7 +81,6 @@ def alpha_index(d, a):
 
 
 def by_seed(path, *keys):
-
     d = need(path)
     arrs = []
     for k in keys:
@@ -134,7 +128,6 @@ def HB(key, alpha, unit, what):
 
 
 def SW_MEAN_GE(key, thr, unit, what):
-
     def f():
         d, (v,) = by_seed(SWEEP, key)
         m = np.asarray(d['alphas'], dtype=float) >= thr
@@ -155,7 +148,6 @@ def SW_DIFF(key_a, key_b, alpha, unit, what):
 
 
 def SW_DIFF_ARGMAX(key_a, key_b, unit, what):
-
     def f():
         d, (va, vb) = by_seed(SWEEP, key_a, key_b)
         diff = va - vb
@@ -168,7 +160,6 @@ def SW_DIFF_ARGMAX(key_a, key_b, unit, what):
 
 
 def SW_COUNT_ABOVE(key_a, key_b, label_a, label_b):
-
     def f():
         d, (va, vb) = by_seed(SWEEP, key_a, key_b)
         al = np.asarray(d['alphas'], dtype=float)
@@ -205,7 +196,6 @@ def SW_DIFF_MEAN(key_a, key_b, unit, what):
 
 
 def SW_FALL_FROM_BASELINE(key, thr, unit, what):
-
     def f():
         d, (v,) = by_seed(SWEEP, key)
         al = np.asarray(d['alphas'], dtype=float)
@@ -221,7 +211,6 @@ def SW_FALL_FROM_BASELINE(key, thr, unit, what):
 
 
 def SW_REDUCTION(key_remedy, key_enkf, unit, what, thr=None):
-
     def f():
         d, (vr, ve) = by_seed(SWEEP, key_remedy, key_enkf)
         al = np.asarray(d['alphas'], dtype=float)
@@ -246,7 +235,6 @@ IENKF3 = f'data/stage3_ienkf_seeds_a{IENKF3_ALPHA:g}_w{W}_{MODE}.npz'
 
 
 def IE3(key, unit, what):
-
     def f():
         d = load(IENKF3)
         if d is None:
@@ -265,7 +253,6 @@ def IE3(key, unit, what):
 # section 4.3.1 — QR extrapolation frequency vs ensemble size
 # ---------------------------------------------------------------------------------------
 def EXT(N, alpha=0.1):
-
     def f():
         pat = f'data/stage3_qr_extrapolation_a{alpha:g}_w{W}_{MODE}.npz'
         d = load(pat)
@@ -316,7 +303,6 @@ def s4_name(mode, alpha):
 
 
 def s4_groups(d):
-
     if 'row_seed' not in d.files:
         return [(None, np.arange(len(d['times'])))]
     rs = np.asarray(d['row_seed'])
@@ -324,7 +310,6 @@ def s4_groups(d):
 
 
 def s4_excess(d, idx):
-
     r_b = rmse_percomp(d['xa_base'][idx], d['truth'][idx])
     r_c = rmse_percomp(d['xa_corr'][idx], d['truth'][idx])
     r_p = rmse_percomp(d['xpf_mean'][idx], d['truth'][idx])
@@ -352,7 +337,6 @@ def S4_CORR(mode, alpha, comp):
 
 
 def S4_REMOVED(mode, alpha, relative):
-
     def f():
         p = s4_at(mode, alpha)
         if p is None:
@@ -372,7 +356,6 @@ def S4_REMOVED(mode, alpha, relative):
 
 
 def S4_REMOVED_AGG(mode, thr, agg, agg_name, relative):
-
     def f():
         paths = [(a, p) for a, p in s4_paths(mode) if a >= thr - 1e-9]
         if not paths:
@@ -750,7 +733,6 @@ if gaps:
         print(f'  {r["section"]} {r["label"]}\n      {r["source"]}')
 
 
-
 COUNT_CHECKS = [
     ('IEnKF', 'excess_ie', 'EnKF', 'excess'),
 ]
@@ -790,11 +772,11 @@ for label_a, key_a, label_b, key_b in COUNT_CHECKS:
 
     per_seed = above.sum(axis=0)
     mean_curve = int((ma > mb).sum())
-    print(f'\n  per seed        : ' + ', '.join(f'seed {s} -> {c} of {len(al)}'
-                                                for s, c in zip(seeds, per_seed)))
+    print('\n  per seed        : ' + ', '.join(f'seed {s} -> {c} of {len(al)}'
+                                               for s, c in zip(seeds, per_seed)))
     m_, s_ = stats(per_seed.astype(float))
     print(f'  mean +/- SD     : {m_:.2f} +/- {s_:.2f} of {len(al)}')
     print(f'  seed-mean curve : {mean_curve} of {len(al)}   <- the count a reader gets from '
           f'the figure, which plots the seed means')
     if m_ != mean_curve:
-        print(f'  NOTE: the two counts differ.')
+        print('  NOTE: the two counts differ.')

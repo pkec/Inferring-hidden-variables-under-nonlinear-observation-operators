@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.42 Fixed:   analysis RMSE was POOLED over cycles and components here while every other
@@ -50,14 +48,10 @@ MODE_COL = {'final': '#c0392b', 'tail_mean': '#2471a3'}
 tw = np.load('data/l63_twin.npz')
 truth = tw['truth']; obs_idx = tw['obs_idx']
 truth_at_obs = truth[obs_idx]
-# Was a POOLED RMSE (one mean over cycles AND components) while rls_blind.py, stage4_log.py
-# and stage4_results.py all moved to per-component-then-averaged in 5.18. This figure is
-# cited beside those, so it has to price the correction the same way.
 rmse = rmse_percomp
 
 
 def train(paths, alpha):
-
     first = load_log(paths[0][1], alpha)
     K = n_features(first['U_raw'].shape[1])
     std = RunningStandardiser(first['U_raw'].shape[1] + rls_core.N_DYN)
@@ -77,7 +71,6 @@ def train(paths, alpha):
 
 
 def apply_frozen(w, std, L):
-
     T = L['U_raw'].shape[0]
     pred = np.zeros((T, 3))
     lag_pred = np.zeros(3)
@@ -90,7 +83,6 @@ def apply_frozen(w, std, L):
 
 
 def score(w, std, paths, alpha):
-
     b, c, p_, helped = [], [], [], 0
     for _, path in paths:
         L = load_log(path, alpha); raw = np.load(path)
@@ -126,7 +118,7 @@ A = sorted(res['final'])
 if not A:
     raise SystemExit('no logs found — run stage4_log.py first')
 
-# ================= Figure: grouped bars on BLIND seeds, per alpha plus the mean =================
+# --- figure: grouped bars on BLIND seeds, per alpha plus the mean ---
 groups = [f'{a}' for a in A] + ['mean']
 x = np.arange(len(groups)); width = 0.35
 fig, ax = plt.subplots(figsize=fs.size(0.72, 0.58))
@@ -149,7 +141,7 @@ nfeat = n_features(load_log(f'data/stage4_log_a{A[0]}_s{TRAIN_SEEDS[0]}_{cfg.noi
 #             rf'train {TRAIN_SEEDS} $\rightarrow$ blind {TEST_SEEDS}')
 fs.save(fig, f'{S4}/stage4_weight_selection.png')
 
-# ================= numbers =================
+# --- numbers ---
 print('\n' + '=' * 78)
 print(f'Relative RMSE-excess reduction (+ = helps). {nfeat} features, gamma={GAMMA}.')
 print('=' * 78)

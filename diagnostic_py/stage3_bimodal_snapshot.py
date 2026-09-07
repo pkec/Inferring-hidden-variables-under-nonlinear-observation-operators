@@ -1,10 +1,9 @@
-
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import skew, kurtosis
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import figstyle as fs
 if getattr(fs, 'VERSION', (0, 0)) < (5, 32):      # stale copy on the path?
     raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
@@ -143,7 +142,6 @@ def draw(ax, cloud, name, col, k, pre, show_legend=False, lab_fs=FS, leg_kw=None
 
 
 def single(cloud, name, col, k, pre, stem):
-
     fig, ax = plt.subplots(figsize=fs.size(0.48, 0.72))
     draw(ax, cloud, name, col, k, pre, show_legend=True)
     ax.set_ylabel('count', **fs.LAB)
@@ -155,12 +153,10 @@ def single(cloud, name, col, k, pre, stem):
 
 
 def most_bimodal(fc, n=1):
-
     return sorted(int(i) for i in np.argsort([bimodality(f[:, 0]) for f in fc])[-n:])
 
 
 def controlled_trio(k, carrier_fc, carrier_name):
-
     Af = carrier_fc[k]
     Ae, _, _ = EnKF(Af.copy(), obs[k], R, h, np.random.default_rng(99))
     Ai, _, _ = EnKF_ienkf(Af.copy(), obs[k], R, h, np.random.default_rng(99))
@@ -170,7 +166,6 @@ def controlled_trio(k, carrier_fc, carrier_name):
 
 
 def controlled_summary(ctrl):
-
     print(f"\ncontrolled comparison — one forecast cloud, both analyses  (alpha={A_SNAP})")
     print(f"{'t':>8}{'BC(fc)':>9}{'truth':>9}{'fc mean':>10}{'EnKF':>9}{'IEnKF':>9}"
           f"{'preimages':>20}")
@@ -185,7 +180,6 @@ def controlled_summary(ctrl):
 
 
 def stacked(panels, k, pre, stem, frac=0.75, panel_in=1.35, bins=30):
-
     w = fs.TEXTWIDTH_IN * frac
     fig, ax = plt.subplots(len(panels), 1, sharex=True, squeeze=False,
                            figsize=(w, panel_in * len(panels) + 0.5))

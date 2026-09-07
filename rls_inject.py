@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.18 Changed: analysis RMSE is per-component-then-averaged via rls_core.rmse_percomp,
@@ -8,7 +6,7 @@
 # 4.37 Added: train_inject_chain() — the seed-chained training used to build a frozen
 #      inject model, moved here from rls_blind.py so the trajectory diagnostic can import it
 #      without executing that script (rls_blind has no __main__ guard).
-# 4.33 Changed: online inject parameters set from the sweep — GAMMA 0.5, LAM 0.995 -> 0.99.
+# 4.33 Changed: online inject parameters set from the sweep — GAMMA 0.35, LAM 0.995 -> 0.99.
 # 4.32 Removed: weight saving (rls_blind.py trains its own model with its own parameters).
 # 4.28 Changed: w_hist is NaN-filled past a divergence so those unwritten rows cannot drag
 #      a tail-mean of the weights toward zero.
@@ -49,12 +47,10 @@ import numpy as np
 from scipy import linalg
 from config import cfg, rk4_vec
 from rls_core import (build_features, n_features, RunningStandardiser, RLS, save_stage4,
-                      dyn_row, N_DYN, USE_LAG_XF, load_weights, tail_mean_weights,
-                      rmse_percomp)
+                      dyn_row, N_DYN, USE_LAG_XF, tail_mean_weights, rmse_percomp)
 
 
 def _analysis(Af, d_obs, Cdd, h, rng):
-
     Nm = Af.shape[0]
     psi_f_m = np.mean(Af, 0, keepdims=True)         # (1,3) forecast mean E[x]
     D = rng.multivariate_normal(d_obs, Cdd, Nm)     # (Nm,3) perturbed obs
@@ -77,7 +73,6 @@ def run_enkf_rls(obs, truth, obs_idx, h, xpf_teacher,
                  gamma=0.5, lam=1.0, P0=1e3, use_delta=False,
                  seed=cfg.seed, N=cfg.ensembleN, obs_std=None,
                  w_init=None, std_init=None, P_init=None, freeze=False):
-
     rng = np.random.default_rng(seed)               # fresh rng per run
     n_obs = len(obs)
     obs_std = cfg.obs_std if obs_std is None else obs_std
@@ -107,13 +102,13 @@ def run_enkf_rls(obs, truth, obs_idx, h, xpf_teacher,
     spread  = np.zeros((n_obs, 3))                   # analysis spread (unchanged by the shift)
     pred    = np.zeros((n_obs, 3))                   # learned correction w_{k-1}^T u_k
     target  = np.zeros((n_obs, 3))                   # r_k = pf_teacher - corrected mean
-    rls_resid = np.zeros((n_obs, 3))               # r_k - w_{k-1}^T u_k (convergence metric)
+    rls_resid = np.zeros((n_obs, 3))                 # r_k - w_{k-1}^T u_k (convergence metric)
     w_hist  = np.zeros((n_obs, K, 3))                # weight trajectory, snapshot after each update
     innov   = np.zeros((n_obs, 3))                   # per-cycle mean innovation the corrected filter saw
     diverged_at = None                               # cycle index where the run blew up, or None
-    BLOWUP = 1e3                                     # |state| far beyond the L63 attractor (~|x|<50);
-                                                     # generous, but low enough that the next
-                                                     # window's quadratic terms cannot overflow
+    # |state| far beyond the L63 attractor (~|x|<50): generous, but low enough that the next
+    # window's quadratic terms cannot overflow
+    BLOWUP = 1e3
     d_prev = np.zeros(3)                             # previous cycle's innovation (for the lag feature)
     xf_prev = np.zeros(3)                            # previous cycle's forecast mean (lag_xf)
     lag_pred = np.zeros(3)                           # model's own previous prediction (autoregressive)
@@ -209,7 +204,6 @@ def run_enkf_rls(obs, truth, obs_idx, h, xpf_teacher,
 
 
 def train_inject_chain(paths, alpha, lam, gamma, ostd, truth, obs_idx, tail_frac=0.5):
-
     h = lambda x: x + alpha * x ** 2
     w_c = std_c = P_c = None
     hist = []
@@ -234,12 +228,12 @@ def train_inject_chain(paths, alpha, lam, gamma, ostd, truth, obs_idx, tail_frac
 
 
 if __name__ == '__main__':
-    ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]                # nonlinearity strengths to sweep; list
+    ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]            # nonlinearity strengths to sweep; list
     SEEDS = cfg.seeds                                  # seeds trained in order, state carried forward
     # ONLINE inject parameters: the learning run, weights updating every cycle. The BLIND
     # (frozen-weight) counterpart has its own lambda and gamma in rls_blind.py. From
     # diagnostic_py/stage4_sweep.py.
-    GAMMA = 0.35                                        # injection strength
+    GAMMA = 0.35                                       # injection strength
     LAM = 0.99                                         # forgetting factor
     P0 = 1e3
     USE_DELTA = False
@@ -319,6 +313,6 @@ if __name__ == '__main__':
                           w_hist=cat('w_hist'), sqerror_corr=cat('sqerror'), innov=cat('innov'),
                           row_seed=np.concatenate([np.full(len(p_['log']['times']), p_['seed'])
                                                    for p_ in per_seed]))
-        print(f'| alpha={a} [{len(per_seed)} seeds, {len(times)} cycles] lambda={LAM} | \n'
+        print(f'| alpha={a} [{len(per_seed)} seeds, {len(times)} cycles] lambda={LAM} |\n'
               f'RMSE enkf={rmse_enkf:.3f} inject_est={rmse_inj:.3f} pf={rmse_pf:.3f} -> {out}')
         print()

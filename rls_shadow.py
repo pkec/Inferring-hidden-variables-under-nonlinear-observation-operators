@@ -1,4 +1,3 @@
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.18 Changed: analysis RMSE is per-component-then-averaged via rls_core.rmse_percomp,
@@ -39,17 +38,17 @@ from config import cfg
 from rls_core import (load_log, n_features, RunningStandardiser, RLS, save_stage4,
                       dyn_row, N_DYN, rmse_percomp)
 
-ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]                # nonlinearity strengths to learn; list
+ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]            # nonlinearity strengths to learn; list
 SEEDS = cfg.seeds                                  # seeds trained in order, weights carried forward
 # ONLINE shadow parameters: this is the learning run, weights updating every cycle. The
 # BLIND (frozen-weight) counterpart has its own lambda and gamma in rls_blind.py — they are
 # separate objectives and need not agree. From diagnostic_py/stage4_sweep.py.
-LAM = 0.995                                          # forgetting factor lambda in (0,1]; 1 -> batch OLS
+LAM = 0.995                                        # forgetting factor lambda in (0,1]; 1 -> batch OLS
 # Correction strength. Shadow is post-hoc — the correction never feeds back, so nothing can
 # compound and there is no stability reason to damp it; gamma here is purely an accuracy
 # choice, taken from the sweep rather than set to 1 on principle.
 GAMMA = 0.7
-P0 = 1e3                                            # initial P scale; large = weak prior on weights
+P0 = 1e3                                           # initial P scale; large = weak prior on weights
 USE_DELTA = False                                  # True only when training spans several alpha
 # NOTE: this script no longer saves a weight file. rls_blind.py trains its own model with
 # its own parameters, because "best on the seeds we trained on" and "best once frozen and
@@ -121,6 +120,6 @@ for ALPHA in ALPHAS:
                       xa_corr=xa_shadow, xa_base=xa_mean, xpf_mean=xpf_mean, truth=truth,
                       w_hist=w_hist, sqerror_corr=(xa_shadow - truth) ** 2,
                       innov=np.concatenate(all_innov), row_seed=np.concatenate(all_seed))
-    print(f'| alpha={ALPHA} [{len(paths)} seeds, {len(times)} cycles] lambda={LAM} | \n'
+    print(f'| alpha={ALPHA} [{len(paths)} seeds, {len(times)} cycles] lambda={LAM} |\n'
           f'RMSE enkf={rmse_enkf:.3f} shadow_est={rmse_shadow:.3f} pf={rmse_pf:.3f} -> {out}')
     print()

@@ -34,7 +34,8 @@ for n in cfg.n_list:
     out[f'truth_{n}'] = truth
     out[f'obs_{n}'] = obs
     out[f'obs_sites_{n}'] = obs_sites
-    print(f"n={n:3d}  p={len(obs_sites):3d}  truth std={truth.std():.2f}")
+    clim = truth.std(axis=0).mean()                    # per site, then averaged
+    print(f"n={n:3d}  p={len(obs_sites):3d}  truth std={clim:.2f}")
 
 np.savez('data/l96_twin.npz', obs_idx=obs_idx, n_list=cfg.n_list,
          alpha=cfg.alpha, obs_std=cfg.obs_std, dt=cfg.dt, **out)

@@ -1,16 +1,13 @@
-
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import numpy as np
 import matplotlib.pyplot as plt
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import figstyle as fs
 if getattr(fs, 'VERSION', (0, 0)) < (5, 29):      # stale copy on the path?
     raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
                      f'the current version and delete any __pycache__ beside it')
 from config import cfg
-
-fs.use()
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
@@ -37,6 +34,8 @@ fs.use()
 # 2.5  created — spread/RMSE vs alpha
 # ============================================================
 
+fs.use()
+
 # ---- label / legend sizing ---------------------------------------------------------------
 # Model figure: stage4_excess_gap_alpha. It prints at 0.5\textwidth, so at a common 9pt its
 # labels fill more of the exported PNG than this 0.72 figure does. LABEL_SCALE multiplies
@@ -44,32 +43,22 @@ fs.use()
 # Set it to 1.0 to go back to plain figstyle sizes (9pt/8pt/7.5pt on the page).
 LABEL_SCALE = 1.4
 
-def scaled(kw, s=None):
-
-    s = LABEL_SCALE if s is None else s
+def scaled(kw, s=LABEL_SCALE):
     out = dict(kw)
-    for k in ('fontsize', 'size'):
-        if isinstance(out.get(k), (int, float)):
-            out[k] = out[k] * s
-    p = out.get('prop')
-    if isinstance(p, dict):
-        q = dict(p)
-        if isinstance(q.get('size'), (int, float)):
-            q['size'] = q['size'] * s
-        out['prop'] = q
-    elif p is not None and hasattr(p, 'get_size'):        # a FontProperties instance
-        q = p.copy(); q.set_size(p.get_size() * s); out['prop'] = q
+    if 'fontsize' in out:                                 # fs.LAB
+        out['fontsize'] = out['fontsize'] * s
+    if 'prop' in out:                                     # fs.LEG, via fs.leg_above
+        out['prop'] = dict(out['prop'], size=out['prop']['size'] * s)
     return out
 
 LAB = scaled(fs.LAB)
-_tk = plt.rcParams['xtick.labelsize']                     # figstyle sets this in fs.use()
-TICKSIZE = (_tk if isinstance(_tk, (int, float)) else 8) * LABEL_SCALE
+TICKSIZE = fs.TICK * LABEL_SCALE
 
 os.makedirs('figs/diagnostic', exist_ok=True)
 W, mode, jit = cfg.obs_every, cfg.noise_mode, cfg.jitter_mode
 f = f'data/stage2_results_w{W}_{mode}_{jit}.npz'
 if not os.path.exists(f):
-    raise SystemExit(f'{f} not found — run stage2.py first')
+    raise SystemExit(f'{f} not found — run error_sweep.py first')
 
 d = np.load(f); a = d['alphas']
 sd = lambda k: d[k] if k in d.files else np.zeros_like(a)

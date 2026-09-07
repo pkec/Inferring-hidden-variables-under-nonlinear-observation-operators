@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.34 Changed: sizing and fonts come from figstyle. The 7.5in and 14in exports shrank by
@@ -108,7 +106,6 @@ P0 = 1e3
 USE_DELTA = False
 BASE, PFC, SHA, BLI = '#c0392b', '#16a085', '#e67e22', '#8e44ad'
 fs.use()
-AX, FS = fs.AX, fs.FS     # sizes come from figstyle; do not re-assert them here
 
 tw = np.load('data/l63_twin.npz')
 truth = tw['truth']; obs_idx = tw['obs_idx']
@@ -117,7 +114,6 @@ rmse = rmse_percomp                     # per component, then averaged over x, y
 
 
 def train_shadow(paths, alpha, lam, tail_frac):
-
     first = load_log(paths[0][1], alpha, use_delta=USE_DELTA)
     K = n_features(first['U_raw'].shape[1])
     std = RunningStandardiser(first['U_raw'].shape[1] + N_DYN)
@@ -136,7 +132,6 @@ def train_shadow(paths, alpha, lam, tail_frac):
 
 
 def apply_blind(w, std, L):
-
     T = L['U_raw'].shape[0]
     pred = np.zeros((T, 3))
     lag_pred = np.zeros(3)
@@ -146,7 +141,6 @@ def apply_blind(w, std, L):
         pred[t] = w.T @ u
         lag_pred = pred[t]                                # autoregressive, own output only
     return pred
-
 
 
 SOURCE_MODES = ['shadow', 'inject']
@@ -159,14 +153,13 @@ def blind_shadow(w, std, L, raw, gamma):
 
 
 def blind_inject(w, std, a, raw, ostd, gamma):
-
     h = lambda x: x + a * x ** 2
     base = cfg.perturb_std.copy()                   # match the logged jitter calibration
     if 'en_mult' in raw.files:
         cfg.perturb_std = base * float(raw['en_mult'])
     res = run_enkf_rls(raw['obs'], truth, obs_idx, h, raw['xpf_mean'], gamma=gamma,
-                       seed=int(raw['seed']) if 'seed' in raw.files else 0,
-                       obs_std=ostd, w_init=w, std_init=std, freeze=True)
+                       seed=int(raw['seed']), obs_std=ostd,
+                       w_init=w, std_init=std, freeze=True)
     cfg.perturb_std = base
     return res['en_mean'], res['pred'], res['target'], res['diverged_at']
 
@@ -188,7 +181,6 @@ for source in SOURCE_MODES:
 
         ai = int(np.argmin(np.abs(tw['alphas'] - a)))
         ostd = tw['obs_std_alpha'][ai]
-
 
         if source == 'shadow':
             w, std = train_shadow(tr_paths, a, P['lam'], P['tail_frac'])
@@ -269,7 +261,7 @@ for source, results in all_results.items():
         print(f'saved {out}')
 
 
-# ================= figures, one set per source model =================
+# --- figures, one set per source model ---
 for source, results in all_results.items():
     A = sorted(results)
     tb = [(results[a]['nonblind'][0] - results[a]['pf_train']) / results[a]['pf_train'] * 100
@@ -355,7 +347,7 @@ for source, results in all_results.items():
             figx.savefig(o, dpi=fs.DPI, bbox_inches='tight'); plt.close(figx)
             print(f'saved {o}')
 
-# ================= summary =================
+# --- summary ---
 for source, results in all_results.items():
     A = sorted(results)
     print(f'\n[{source} model] blind vs optimistic — relative RMSE-excess reduction, '

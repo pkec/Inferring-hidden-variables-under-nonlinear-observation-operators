@@ -239,9 +239,8 @@ h, l = axes[0, 0].get_legend_handles_labels()
 fig.legend(h, l, **fs.leg_fig(ncol=1, y=1.0))
 fs.save(fig, 'figs/results/stage1_rank_hist.png', tight=False)
 
-# ============================================================
-# SAVE METRICS TO NPZ
-# ============================================================
+
+# ---- save metrics to npz ----
 # One file per window. Everything is saved PER SEED: the thesis sheet quotes seed columns,
 # and no seed-averaged array can be un-averaged back into them. Each quantity appears twice,
 # per component (S, 3) and as the equal-weight headline (S,), so nothing downstream has to

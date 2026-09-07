@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 # 4.40 Added: blind_seeds (default [100,101,102]) + env override L63_BLIND_SEEDS — the runs
 #      the blind RLS fits its frozen weights on; set to a single seed to train on one
 #      trajectory
-# 4.38 Changed: ensembleN 1000 -> 100 and now means the EnKF family only; new particleN=1000
+# 4.38 Changed: ensembleN 1000 -> 300 and now means the EnKF family only; new particleN=1000
 #      for the PF. One shared size made the two filters look equally expensive.
 # 2.14 Added: seeds list (default [0,1,2]) + env override L63_SEEDS, for Stage 2 seed-averaging
 # 2.9  Changed: per-window baselines named W5_PERTURB_STD / W15_PERTURB_STD; verified each
@@ -61,7 +61,8 @@ from dataclasses import dataclass, field
 #   seed         RNG seed. Vary it to seed-average (error bars on the Stage 2 figure).
 #   obs_std      per-axis sensor noise std; sets R and the effective SNR at alpha=0.
 #   perturb_std  base ensemble jitter, set automatically from obs_every (PERTURB_BY_WINDOW);
-#                stage2.py / window_sweep.py scan multiples of it to calibrate spread/RMSE ~ 1.
+#                error_sweep.py / stage2_window_sweep.py scan multiples of it to calibrate
+#                spread/RMSE ~ 1.
 #
 #   run.py sweeps window x noise_mode in one click via env vars L63_OBS_EVERY /
 #   L63_NOISE_MODE, which override the dataclass defaults below.
@@ -98,7 +99,8 @@ class L63Config:
     obs_std: np.ndarray = field(default_factory=lambda: np.array([2.0, 2.5, 2.15]))
     init_std: np.ndarray = field(default_factory=lambda: np.array([2.0, 2.5, 2.15]))
 
-    perturb_std: np.ndarray = field(default_factory=lambda: np.array([0.02, 0.025, 0.0215])) #set per window below
+    perturb_std: np.ndarray = field(default_factory=lambda: np.array([0.02, 0.025, 0.0215]))  # set per window below
+
     # observation error covariance (diagonal), derived from obs_std
     @property
     def R(self):
@@ -106,7 +108,7 @@ class L63Config:
 
     # reproducibility
     seed: int = 0                                              # single-seed default (Stage 1, diagnostics)
-    seeds: list = field(default_factory=lambda: [0, 1, 2])    # Stage 2 seed-averaging set
+    seeds: list = field(default_factory=lambda: [0, 1, 2])     # Stage 2 seed-averaging set
     blind_seeds: list = field(default_factory=lambda: [100, 101, 102])  # blind RLS training set
 
     # ensemble sizes, set independently. The EnKF family needs far fewer members than the
@@ -181,7 +183,7 @@ def rk4_vec(S, dt):
     return S + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
 
 
-
+# --- shared metric definitions ---
 
 CAL_RATIO_CONVENTION = (
     'calibration ratio = mean over x, y, z of (spread_i / RMSE_i), with '
@@ -191,33 +193,27 @@ CAL_RATIO_CONVENTION = (
 
 
 def rmse_comp(out):
-
     return np.sqrt(np.asarray(out['sqerror']).mean(0))
 
 
 def spread_comp(out):
-
-    return np.sqrt(np.asarray(out['spread']).mean(0))
+    return np.sqrt(np.asarray(out['spread']).mean(0))       # out['spread'] is VARIANCE
 
 
 def cal_ratio_comp(out):
-
     return spread_comp(out) / rmse_comp(out)
 
 
 def cal_ratio(out):
-
     return float(cal_ratio_comp(out).mean())
 
 
 def fc_var_comp(out):
-
     fc = out.get('fc_spread') if hasattr(out, 'get') else None
     if fc is None:
         return None
-    return np.nanmean(np.asarray(fc) ** 2, axis=0)
+    return np.nanmean(np.asarray(fc) ** 2, axis=0)          # out['fc_spread'] is STD
 
 
 def cal_gap(out):
-
     return abs(cal_ratio(out) - 1.0)

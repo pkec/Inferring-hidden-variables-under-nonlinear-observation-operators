@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.32 Added: panel_letter() — (a)/(b)/(c) inside the top-left of a panel, for merged
@@ -76,13 +74,11 @@ SERIES = 0.62      # time series: wide and short by nature
 
 
 def size(frac, aspect=XY):
-
     w = TEXTWIDTH_IN * frac
     return (w, w * aspect)
 
 
 def compact(ax, label, pos='y', nbins=4, sci=True):
-
     ax.xaxis.set_major_locator(MaxNLocator(nbins))
     ax.yaxis.set_major_locator(MaxNLocator(nbins))
     if sci:
@@ -102,7 +98,6 @@ def compact(ax, label, pos='y', nbins=4, sci=True):
 
 
 def panel_letter(ax, i, inside=True, weight='bold'):
-
     lab = f'({chr(ord("a") + i)})'
     if inside:
         ax.text(0.03, 0.97, lab, transform=ax.transAxes, ha='left', va='top',
@@ -114,7 +109,6 @@ def panel_letter(ax, i, inside=True, weight='bold'):
 
 
 def leg_above(ncol=3, **kw):
-
     d = dict(LEG)
     d.update(loc='lower center', bbox_to_anchor=(0.5, 1.01), ncol=ncol,
              columnspacing=0.7, handletextpad=0.4, framealpha=0)
@@ -123,7 +117,6 @@ def leg_above(ncol=3, **kw):
 
 
 def leg_fig(ncol=3, y=0.99):
-
     return dict(loc='lower center', bbox_to_anchor=(0.5, y), ncol=ncol, framealpha=0,
                 prop=dict(family=AX, size=LEGEND), columnspacing=1.2, handletextpad=0.4)
 

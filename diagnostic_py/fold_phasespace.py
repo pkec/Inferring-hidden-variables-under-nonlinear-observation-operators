@@ -1,4 +1,3 @@
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.38 Fixed: the (a) letter was hidden under the panel-(a) legend — both want the top-left
@@ -35,7 +34,7 @@ os.makedirs('figs/results', exist_ok=True)
 fs.use()
 FRAC = 0.48                                       # two panels across the text width
 ALPHAS = [0.1, 0.5, 1.0]
-COL = ['#2471a3', '#e67e22', '#c0392b']          # one per alpha
+COL = ['#2471a3', '#e67e22', '#c0392b']           # one per alpha
 ATT = '#999999'                                   # attractor trace
 
 # --- truth trajectory: same recipe as the sweep, transient discarded ---
@@ -57,7 +56,7 @@ def panel_attractor(ax):
         ax.axvline(f, ls='--', color=c, lw=1.5, zorder=3, label=rf'$\alpha$={a}')
         ax.axhline(f, ls=':', color=c, lw=1.2, zorder=2)
     ax.axhline(z.min(), ls='-', color='#333', lw=1.0, zorder=4)
-    ax.annotate(f'$x_{{3\\, min}}$', xy=(x.min(), z.min()),
+    ax.annotate(r'$x_{3\, min}$', xy=(x.min(), z.min()),
                 xytext=(4, 6), textcoords='offset points', color='#333', **fs.ANN)
     ax.set_ylim(min(folds) - 2, z.max() + 3)
     ax.set_xlabel('$x_1$', **fs.LAB); ax.set_ylabel('$x_3$', **fs.LAB)

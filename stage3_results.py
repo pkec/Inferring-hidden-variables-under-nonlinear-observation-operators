@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,7 +6,7 @@ if getattr(fs, 'VERSION', (0, 0)) < (5, 32):      # stale copy on the path?
     raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
                      f'the current version and delete any __pycache__ beside it')
 from config import cfg
- 
+
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.32 Added: (a)/(b)/(c) in the top-left of each panel of the merged figure, via
@@ -69,19 +68,19 @@ from config import cfg
 # 3.5  Added: iterative-EnKF line on all three metric panels; panels skip absent remedies
 # 3.2  created — Stage 3 error panel (standard EnKF vs quad-reg EnKF, 2 lines per metric)
 # ============================================================
- 
+
 os.makedirs('figs/results', exist_ok=True)
 W, mode, jit = cfg.obs_every, cfg.noise_mode, cfg.jitter_mode
 f = f'data/stage2_results_w{W}_{mode}_{jit}.npz'
 if not os.path.exists(f):
-    raise SystemExit(f'{f} not found — run stage2.py first')
- 
+    raise SystemExit(f'{f} not found — run error_sweep.py first')
+
 fs.use()
 AX, FS = fs.AX, fs.FS       # sizes come from figstyle; do not re-assert them here
-FRAC, ASP = 0.32, fs.XY     # three panels across the text width.
-                            # For roomier panels use 0.48 / fs.WIDE — they then
-                            # wrap to two rows in LaTeX, costing ~0.29 page.
- 
+# three panels across the text width. For roomier panels use 0.48 / fs.WIDE — they then
+# wrap to two rows in LaTeX, costing ~0.29 page.
+FRAC, ASP = 0.32, fs.XY
+
 d = np.load(f); a = d['alphas']
 sd = lambda k: d[k] if k in d.files else np.zeros_like(a)   # seed std if present
 
@@ -94,25 +93,23 @@ sd = lambda k: d[k] if k in d.files else np.zeros_like(a)   # seed std if presen
 # quietly.
 CONV = str(d['rmse_convention']) if 'rmse_convention' in d.files else None
 if CONV is None:
-    print('!' * 78)
-    print(f'WARNING: {f} predates error_sweep.py 5.16 (no rmse_convention key).')
-    print('Its excess_pct is the POOLED RMSE ratio, NOT the per-component-then-averaged')
-    print('number the write-up quotes. Rerun error_sweep.py before using these figures.')
-    print('!' * 78)
+    print(f'WARNING: {f} predates error_sweep.py 5.16 (no rmse_convention key). Its\n'
+          f'excess_pct is the POOLED RMSE ratio, not the per-component-then-averaged number\n'
+          f'the write-up quotes. Rerun error_sweep.py before using these figures.')
 else:
     print(f'RMSE convention: {CONV}')
- 
+
 # each filter: (label, colour, marker, jensen key, crosscov key, excess key)
 ENKF = ('EnKF',           '#c0392b', 'o-', 'jensen_norm',    'crosscov_err',    'excess_pct')
 QR   = ('QR-EnKF',        '#e67e22', 'D-', 'jensen_qr_norm', 'crosscov_qr_err', 'excess_qr_pct')
 IE   = ('IEnKF',          '#2471a3', '^-', 'jensen_ie_norm', 'crosscov_ie_err', 'excess_ie_pct')
- 
+
 # (filename stem, index into the key triple, y-label) — same order as the old (a)/(b)/(c) panels
 PANELS = [('jensen_bias',  0, r'$\|E[h(x)]-h(E[x])\|$'),
           ('crosscov_err', 1, r'$\mathcal{E}_{xh}$'),
           ('rmse_excess',  2, 'excess over PF (%)')]
- 
- 
+
+
 def draw(ax, series, ki, ylab, legend=True, compact=False):
     if ki == 2:
         ax.axhline(0, ls='--', color='#777', lw=1)          # PF baseline (0% excess)
@@ -131,8 +128,8 @@ def draw(ax, series, ki, ylab, legend=True, compact=False):
     ax.grid(alpha=0.3)
     if legend:
         ax.legend(**fs.leg_above(ncol=len([t for t in series if t[3] in d.files])))
- 
- 
+
+
 def make(series, suffix):
     # one standalone PNG per metric — these are the write-up figures
     for stem, ki, ylab in PANELS:
@@ -142,7 +139,7 @@ def make(series, suffix):
         out = f'figs/results/stage3_{stem}_{suffix}w{W}.png'
         fig.savefig(out, dpi=fs.DPI, bbox_inches='tight'); plt.close(fig)
         print(f'saved {out}')
- 
+
     # combined 1x3 — now the WRITE-UP figure rather than the backup. Three separate PNGs in
     # 0.32 subfigures give a 3.35cm plot box; this gives 4.59cm at the same page height, because
     # the y-labels move above the axes and matplotlib controls the gutters instead of LaTeX.
@@ -155,13 +152,13 @@ def make(series, suffix):
         fig.legend(h, l, **fs.leg_fig(ncol=len(l)))
     fig.tight_layout(w_pad=0.4)
     fs.save(fig, f'figs/results/stage3_errors_{suffix}w{W}.png', tight=False)
- 
- 
+
+
 make([ENKF, QR],     'qr_')
 make([ENKF, IE],     'ie_')
 make([QR,   IE],     'qrie_')
 make([ENKF, QR, IE], '')
- 
+
 # ---- percentage points of the EnKF's excess that each remedy removes, per alpha ----
 # Both excesses are already in % of PF RMSE, so their difference is in percentage points:
 # a remedy at 18.2% against an EnKF at 25.4% has removed 7.2 pp. Positive = the remedy closed
@@ -174,7 +171,7 @@ for ai, al in enumerate(a):
     for _, _, ke in present:
         line += f"{d[ke][ai]:14.1f}%{d['excess_pct'][ai] - d[ke][ai]:+9.1f}"
     print(line)
- 
+
 # ---- same quantity as a grouped bar chart ----
 # Bars are placed on a categorical axis (one slot per alpha) rather than at the alpha value,
 # so the group spacing stays even if the sweep grid is ever made non-uniform.

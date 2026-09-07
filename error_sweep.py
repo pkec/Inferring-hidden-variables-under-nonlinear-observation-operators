@@ -1,4 +1,3 @@
-
 import numpy as np
 from config import (cfg, cal_ratio, cal_ratio_comp, cal_gap, rmse_comp, spread_comp,
                     fc_var_comp, CAL_RATIO_CONVENTION, PERTURB_BASELINE_ALPHA)
@@ -93,15 +92,15 @@ jitter_mults = np.geomspace(0.3, 30, 9)   # two-sided: can lower OR raise the ba
 
 
 def calibrate(run_fn, obs, h, ostd, seed):
-
     best_cal, best_any = None, None
     for m in jitter_mults:
         cfg.perturb_std = base * m
         out = run_fn(obs, truth, obs_idx, h, seed=seed, obs_std=ostd)
         rm = rmse_comp(out).mean()                    # equal-weight headline RMSE for this run
-        if not np.isfinite(rm):                       # diverged at this jitter; not a candidate.
-            continue                                  # without this it sticks as best_any, since
-                                                      # every later `rm < nan` compares False
+        # a diverged multiplier is not a candidate: `rm < nan` is always False, so without
+        # this skip the first NaN would stick as best_any for the rest of the scan
+        if not np.isfinite(rm):
+            continue
         if best_any is None or rm < best_any[1]:
             best_any = (out, rm, m)
         if rm < 0.25 * clim:                          # tracking; eligible for calibration
@@ -117,7 +116,6 @@ def calibrate(run_fn, obs, h, ostd, seed):
 
 
 def run_at(run_fn, obs, h, ostd, m, seed):
-
     cfg.perturb_std = base * m
     out = run_fn(obs, truth, obs_idx, h, seed=seed, obs_std=ostd)
     cfg.perturb_std = base
@@ -129,7 +127,6 @@ def run_at(run_fn, obs, h, ostd, m, seed):
 
 
 def tune(run_fn, obs, h, ostd, seed, alpha):
-
     if cfg.jitter_mode == 'fixed' or float(alpha) == PERTURB_BASELINE_ALPHA:
         return run_at(run_fn, obs, h, ostd, 1.0, seed)
     return calibrate(run_fn, obs, h, ostd, seed)
@@ -157,7 +154,6 @@ _no_fc = set()          # filters that returned no fc_spread; warned about once 
 
 
 def fcvar(out, name):
-
     v = fc_var_comp(out)
     if v is None:
         if name not in _no_fc:
@@ -167,13 +163,14 @@ def fcvar(out, name):
         return np.full(3, np.nan)
     return v
 
+
 for ai, a in enumerate(alphas):
     h = lambda x, a=a: x + a * x**2
     h_truth = truth_at_obs + a * truth_at_obs**2          # noiseless h(truth), shared across seeds
     for si, s in enumerate(seeds):
         obs = h_truth + noise[si] * obs_std_alpha[ai]     # this seed's observation realization
         en, em, er = tune(run_enkf,       obs, h, obs_std_alpha[ai], s, a)
-        qr, qm, qrr = tune(run_enkf_qr,    obs, h, obs_std_alpha[ai], s, a)
+        qr, qm, qrr = tune(run_enkf_qr,   obs, h, obs_std_alpha[ai], s, a)
         ie, im, ir = tune(run_enkf_ienkf, obs, h, obs_std_alpha[ai], s, a)
         pf, pm, pr = tune(run_pf,         obs, h, obs_std_alpha[ai], s, a)
 
@@ -300,7 +297,7 @@ for ai, a in enumerate(alphas):
 # is no longer a scan result: it is the window baseline, which is what stage1_results.py runs,
 # so the two files must agree there to the last digit. If they do not, something upstream
 # (truth recipe, obs draw, obs_std) has drifted between the two scripts.
-print(f"\ncalibration ratio (spread/RMSE, mean over x, y, z) and jitter multiplier")
+print("\ncalibration ratio (spread/RMSE, mean over x, y, z) and jitter multiplier")
 print(f"{'alpha':>6}{'EnKF':>9}{'x':>7}{'PF':>9}{'x':>7}{'QR':>9}{'x':>7}{'IEnKF':>9}{'x':>7}   jitter")
 for ai, a in enumerate(alphas):
     src = 'BASELINE (= stage1_results.py)' if float(a) == PERTURB_BASELINE_ALPHA \
@@ -311,7 +308,7 @@ for ai, a in enumerate(alphas):
 
 
 if np.isfinite(mean['en_fcvar']).any():
-    print(f"\nforecast variance (prior, before the update) and contraction vs the EnKF")
+    print("\nforecast variance (prior, before the update) and contraction vs the EnKF")
     print(f"{'alpha':>6}{'EnKF':>11}{'QR':>11}{'IEnKF':>11}{'QR fall %':>11}{'IE fall %':>11}")
     for ai, a in enumerate(alphas):
         e, q, i_ = mean['en_fcvar'][ai], mean['qr_fcvar'][ai], mean['ie_fcvar'][ai]
@@ -319,7 +316,7 @@ if np.isfinite(mean['en_fcvar']).any():
             print(f"{a:6.1f}{e:11.4f}{q:11.4f}{i_:11.4f}"
                   f"{(e - q) / e * 100:11.1f}{(e - i_) / e * 100:11.1f}")
 
-print(f"\nper-seed EnKF calibration ratio (what the thesis sheet quotes)")
+print("\nper-seed EnKF calibration ratio (what the thesis sheet quotes)")
 print(f"{'alpha':>6}" + ''.join(f"{'seed ' + str(s):>10}" for s in seeds) + f"{'mean':>10}{'sd':>9}")
 for ai, a in enumerate(alphas):
     print(f"{a:6.1f}" + ''.join(f"{v:10.4f}" for v in acc['en_ratio'][ai])

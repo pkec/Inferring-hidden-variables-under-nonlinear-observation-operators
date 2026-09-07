@@ -13,7 +13,6 @@ from config_l96 import cfg, rk4_vec
 
 
 def run_pf_l96(obs, truth, obs_idx, obs_sites, N, seed=cfg.seed):
-
     rng = np.random.default_rng(seed)
     n = truth.shape[1]
     R = cfg.obs_std ** 2
@@ -68,15 +67,17 @@ if __name__ == '__main__':
         truth = data[f'truth_{n}']
         obs = data[f'obs_{n}']
         obs_sites = data[f'obs_sites_{n}']
-        clim = truth.std()                       # RMSE of a filter that just guesses the mean
+        clim = truth.std(axis=0).mean()          # RMSE of a filter that just guesses the mean
         for j, N in enumerate(cfg.N_list):
             res = run_pf_l96(obs, truth, obs_idx, obs_sites, N)
+            rmse_c = np.sqrt(res['sqerror'].mean(0))       # (n,) per site, over cycles
+            spread_c = np.sqrt(res['spread'].mean(0))
             ess_min[i, j] = res['ess'].min()
-            rmse[i, j] = np.sqrt(res['sqerror'].mean())
-            spread[i, j] = np.sqrt(res['spread'].mean())
-            print(f"n={n:3d}  N={N:6d}  min ESS={ess_min[i,j]:7.1f}  "
-                  f"spread={spread[i,j]:.3f}  RMSE={rmse[i,j]:.3f}  "
-                  f"spread/RMSE={spread[i,j]/rmse[i,j]:.2f}  clim={clim:.2f}")
+            rmse[i, j] = rmse_c.mean()                     # equal weight per site
+            spread[i, j] = spread_c.mean()
+            print(f"n={n:3d}  N={N:6d}  min ESS={ess_min[i, j]:7.1f}  "
+                  f"spread={spread[i, j]:.3f}  RMSE={rmse[i, j]:.3f}  "
+                  f"spread/RMSE={(spread_c / rmse_c).mean():.2f}  clim={clim:.2f}")
 
     np.savez('data/l96_pf_ess.npz', ess_min=ess_min, rmse=rmse, spread=spread,
              n_list=cfg.n_list, N_list=cfg.N_list)

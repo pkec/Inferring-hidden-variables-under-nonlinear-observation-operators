@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.40 Removed: bar-value labels. The full table is in the appendix, and at 90 degrees the
@@ -80,7 +78,6 @@ FRAC = 0.48               # each thesis panel is one of two across the text widt
 
 
 def load(src, sheet, stride):
-
     df = pd.read_excel(src, sheet_name=sheet)
     df = df.loc[:, ~df.columns.astype(str).str.startswith('Unnamed')]
     for c in ['stride', 'seed', 'n', 'N', 'min ESS', 'spread/RMSE', 'min ESS / N (%)']:
@@ -150,7 +147,6 @@ width = 0.26
 
 
 def panel(ax, which, lab_fs=FS, show_pts=False, legend=True):
-
     v, p = (mean[which], pts[which]) if which.startswith('ess') else (mean['ratio'], pts['ratio'])
     for j, N in enumerate(Ns):
         off = x + (j - 1) * width
@@ -158,7 +154,7 @@ def panel(ax, which, lab_fs=FS, show_pts=False, legend=True):
         if show_pts:                      # n=3, so show the runs rather than an error bar
             jit = np.linspace(-0.28, 0.28, p.shape[2]) * width   # spread across the bar, so
             for i in range(len(ns)):                             # points miss the bar label
-                ax.plot(off[i] + jit, p[i, :, j], 'o', ms=2.2,
+                ax.plot(off[i] + jit, p[i, j, :], 'o', ms=2.2,
                         mfc='none', mec='#222', mew=0.6, zorder=5,
                         label='per seed' if (j == 0 and i == 0) else None)
     if which.startswith('ess'):
@@ -189,8 +185,7 @@ for stem, key in (('ess', ESS_KEY), ('calibration', 'calibration')):
     panel(ax, key)
     fs.save(fig, f'figs/diagnostic/tmp_l96_{stem}_thesis.png')
 
-# combined 1x2, kept as the backup / log view
-# merged 1x2 at \\textwidth — one image, one caption, with the letters drawn in
+# merged 1x2 at \textwidth — one image, one caption, with the letters drawn in
 fig, axes = plt.subplots(1, 2, figsize=fs.size(1.0, 0.36))
 for i, key in enumerate((ESS_KEY, 'calibration')):
     panel(axes[i], key, legend=False)

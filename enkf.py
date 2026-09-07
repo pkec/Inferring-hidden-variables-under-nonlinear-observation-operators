@@ -16,7 +16,6 @@ from config import cfg, rk4_vec
 
 
 def EnKF(Af, d, Cdd, h, rng):
-
     Nm = Af.shape[0]
 
     psi_f_m = np.mean(Af, 0, keepdims=True)         # (1, n_state) = E[x]
@@ -44,7 +43,6 @@ def EnKF(Af, d, Cdd, h, rng):
 
 def run_enkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
              obs_std=None, save_forecast=True):
-
     rng = np.random.default_rng(seed)              # fresh rng per run
     n_obs = len(obs)
     obs_std = cfg.obs_std if obs_std is None else obs_std

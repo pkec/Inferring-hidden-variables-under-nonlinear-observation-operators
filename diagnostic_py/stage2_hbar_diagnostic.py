@@ -166,7 +166,7 @@ keys = ('rmse_en', 'rmse_hb', 'spread_en', 'spread_hb', 'ratio_en', 'ratio_hb',
 ckeys = ('rmse_en_c', 'rmse_hb_c', 'spread_en_c', 'spread_hb_c', 'penalty_c',
          'ratio_en_c', 'ratio_hb_c')
 
-CONVENTION = 'RMSE, spread and penalty: per-component then averaged (5.21); '
+CONVENTION = 'RMSE, spread and penalty: per-component then averaged (5.21)'
 
 if os.path.exists(out):
     print(f'{out} found — plotting from it (delete it to re-run the sweep)')
@@ -197,8 +197,6 @@ else:
             en, em, er = tune(run_enkf, obs, h, obs_std_alpha[ai], s, a)
             hb, hm, hr = tune(run_hbar, obs, h, obs_std_alpha[ai], s, a)
 
-            # per component first, via the shared definitions in config.py so this file
-            # cannot drift from error_sweep.py again
             ren_c = rmse_comp(en); rhb_c = rmse_comp(hb)
             spen_c = spread_comp(en); sphb_c = spread_comp(hb)
             pen_c = (rhb_c - ren_c) / ren_c * 100       # a ratio, so per component then averaged
@@ -216,9 +214,7 @@ else:
             acc['spread_en'][ai, si] = spen_c.mean()
             acc['spread_hb'][ai, si] = sphb_c.mean()
 
-            # er / hr are config.cal_ratio for this seed: mean over i in x,y,z of
-            # spread_i / RMSE_i, with RMSE_i = sqrt(mean_k sqerror[k,i]). By construction
-            # that equals ratio_*_c.mean(), which is asserted below.
+            # config.cal_ratio for this seed; equals ratio_*_c.mean(), asserted below
             acc['ratio_en'][ai, si] = er
             acc['ratio_hb'][ai, si] = hr
 
@@ -236,9 +232,8 @@ else:
               f"||K delta||={np.nanmean(acc['shift'][ai]):.3f}"
               + (f"  [{nd}/{S_} seeds diverged]" if nd else ''))
 
-    # the headline ratio must be the mean of the per-component ratios. The two are built by
-    # different routes — headline from tune(), components in the loop — so this catches any
-    # future edit that reintroduces a second definition of the calibration ratio.
+    # headline ratio and per-component ratios arrive by different routes — tune() and the
+    # loop above — so this catches an edit that reintroduces a second ratio definition.
     for f_ in ('en', 'hb'):
         lhs = acc[f'ratio_{f_}']
         rhs = accc[f'ratio_{f_}_c'].mean(axis=2)

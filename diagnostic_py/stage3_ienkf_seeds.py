@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.47 Added: an npz. Every statistic this script printed — straddle counts, failure onset,
@@ -43,6 +41,10 @@ import textwrap
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import numpy as np
 import matplotlib.pyplot as plt
+import figstyle as fs
+if getattr(fs, 'VERSION', (0, 0)) < (5, 32):      # stale copy on the path?
+    raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
+                     f'the current version and delete any __pycache__ beside it')
 from config import cfg, rk4
 from enkf_ienkf import run_enkf_ienkf
 
@@ -54,7 +56,6 @@ h_a = lambda x: x + ALPHA * x ** 2            # observation operator h_alpha
 FOLD = -1.0 / (2 * ALPHA)                     # x where h_alpha turns over; scalar (= -1 at alpha=0.5)
 STAT_SEEDS = list(cfg.seeds)                  # every seed: what the saved statistics use
 FIG_SEEDS = STAT_SEEDS[:2]                    # seeds 0 and 1; seed 2 dropped for figure legibility
-SEEDS = FIG_SEEDS                             # kept as the name the figure code below uses
 t0, t1 = 18.0, 38.0                           # zoom window in time units, as timeseries.py uses
 IEC, TRU, FOLDC, MARK = '#8e44ad', '#333333', '#c0392b', '#e67e22'
 AX, FS = 'Arial', 14                          # axis-label font, all report figures
@@ -74,11 +75,8 @@ obs_idx = np.arange(cfg.obs_every, cfg.n_steps + 1, cfg.obs_every)
 t_obs = obs_idx * cfg.dt                      # (n_cycles,) cycle times
 n_obs = len(obs_idx)
 
-# --- observation noise: from the twin file, so this is the sweep's experiment ---------
-# It used to be a local recipe (0.25 * h_a(truth).std over the whole trajectory). The sweep
-# uses obs_std_alpha, built as cfg.obs_std / truth[obs_idx].std scaled by h(truth[obs_idx]).std
-# — a different value on each component. Two scripts describing the same alpha under
-# different noise cannot have their numbers quoted side by side.
+# --- observation noise: obs_std_alpha from the twin file, the draw the sweep uses ---
+# Two scripts describing the same alpha under different noise cannot be quoted side by side.
 _tw = np.load('data/l63_twin.npz')
 _ai = int(np.argmin(np.abs(_tw['alphas'] - ALPHA)))
 if abs(float(_tw['alphas'][_ai]) - ALPHA) > 1e-9:
@@ -100,7 +98,6 @@ STRADDLE_THRESH = 0.4                         # near the 0.5 ceiling: ensemble c
 
 
 def spans(mask):
-
     m = np.asarray(mask, dtype=bool)
     if not m.any():
         return []
@@ -115,7 +112,6 @@ def spans(mask):
 
 
 def sustained(bad, hold):
-
     out = np.zeros(len(bad), dtype=bool)
     for a_, b_ in spans(bad):
         if b_ - a_ >= hold:
@@ -124,7 +120,6 @@ def sustained(bad, hold):
 
 
 def onset_cycle(err):
-
     bad = err > FAIL_FRAC * clim              # (n_obs,) boolean
     for k in range(len(bad) - HOLD + 1):
         if bad[k:k + HOLD].all():
@@ -133,14 +128,13 @@ def onset_cycle(err):
 
 
 def one_run(sd, obs):
-
     res = run_enkf_ienkf(obs, truth, obs_idx, h_a, seed=sd,
                          obs_std=obs_std, save_forecast=True)
     fc = res['fc_history']                                 # (n_obs, N, 3) forecast ensemble
     frac_left = (fc[:, :, 0] < FOLD).mean(axis=1)          # (n_obs,) fraction left of the fold
     straddle = np.minimum(frac_left, 1 - frac_left)        # (n_obs,) 0 = one side, 0.5 = split
-    err = np.sqrt(res['sqerror'].mean(1))                  # (n_obs,) per-cycle RMS error over x,y,z
-    spread = np.sqrt(res['spread'].mean(1))                # (n_obs,) per-cycle spread
+    err = np.sqrt(res['sqerror']).mean(1)                  # (n_obs,) per component, then averaged
+    spread = np.sqrt(res['spread']).mean(1)                # (n_obs,) same, from the variance
     lock = sustained(err > FAIL_FRAC * clim, HOLD)         # (n_obs,) inside a lock-on episode
     strad_hi = straddle > STRADDLE_THRESH                  # (n_obs,) near-evenly-split cycles
     return dict(res=res, straddle=straddle, frac_left=frac_left, err=err, spread=spread,
@@ -172,8 +166,7 @@ wint = (t_truth >= t0) & (t_truth <= t1)
 COLS = ['trace', 'straddle', 'err_spread']     # column stems; also the split-PNG filenames
 
 
-def panel(a, sd, ci, legend):
-    """One panel: seed sd, column ci. Drawn onto both the grid and its own figure."""
+def panel(a, sd, ci, legend, ylabel_seed=True, leg_kw=None):
     R = runs[sd]
     onset = R['onset']
     t_onset = t_obs[onset] if onset is not None else None   # time of sustained failure
@@ -182,18 +175,17 @@ def panel(a, sd, ci, legend):
         a.plot(t_truth[wint], truth[wint, 0], '-', color=TRU, lw=1.2, label='truth', zorder=1)
         a.plot(t_obs[win], R['res']['en_mean'][win, 0], '-', color=IEC, lw=1.5,
                label='IEnKF mean', zorder=3)
-        a.axhline(FOLD, ls=':', color=FOLDC, lw=1.4, label=rf'fold $x=-1/(2\alpha)$')
-        a.set_ylabel(f'seed {sd}\nx', fontname=AX, fontsize=FS)
+        a.axhline(FOLD, ls=':', color=FOLDC, lw=1.4, label=r'fold $x=-1/(2\alpha)$')
+        a.set_ylabel(f'seed {sd}\nx' if ylabel_seed else 'x', fontname=AX, fontsize=FS)
     elif ci == 1:          # straddle index from the forecast ensemble
         a.plot(t_obs[win], R['straddle'][win], '-', color=IEC, lw=1.4)
         a.axhline(0.5, ls=':', color='#777', lw=1)          # perfectly split
         a.set_ylim(-0.02, 0.52)
         a.set_ylabel('straddle index', fontname=AX, fontsize=FS)
-    else:                  # error and spread together (flat spread + big error = wrong-basin,
+    else:                  # flat spread beside a big error = wrong basin, not collapse
         a.plot(t_obs[win], R['err'][win], '-', color=FOLDC, lw=1.4, label='RMS error')
         a.plot(t_obs[win], R['spread'][win], '-', color=IEC, lw=1.4, label='spread')
-        a.axhline(FAIL_FRAC * clim, ls=':', color='#777', lw=1,   # not collapse)
-                  label='failure threshold')
+        a.axhline(FAIL_FRAC * clim, ls=':', color='#777', lw=1, label='failure threshold')
         a.set_ylabel('error / spread', fontname=AX, fontsize=FS)
 
     if t_onset is not None and t0 <= t_onset <= t1:
@@ -201,11 +193,10 @@ def panel(a, sd, ci, legend):
     a.set_xlabel('Time', fontname=AX, fontsize=FS)
     a.grid(alpha=0.3)
     if legend and ci != 1:                                  # column 1 has nothing to label
-        a.legend(loc='upper left', prop=LEG)
+        a.legend(**(leg_kw or dict(loc='upper left', prop=LEG)))
 
 
 def figure(seed_list, tag):
-    """One grid (rows = the given seeds) plus one standalone PNG per panel."""
     for sd in seed_list:
         for ci, stem in enumerate(COLS):
             fig, a = plt.subplots(figsize=(6.5, 3.6))
@@ -229,8 +220,8 @@ def figure(seed_list, tag):
     fig.savefig(out, dpi=140, bbox_inches='tight'); plt.close(fig)
     print(f'saved {out}')
 
-def figure_stacked(sd, cols=(0, 1, 2), frac=0.75, panel_in=1.15):
 
+def figure_stacked(sd, cols=(0, 1, 2), frac=0.75, panel_in=1.15):
     fig, ax = plt.subplots(len(cols), 1, sharex=True, squeeze=False,
                            figsize=(fs.TEXTWIDTH_IN * frac, panel_in * len(cols) + 0.45))
     ax = ax[:, 0]
@@ -249,7 +240,7 @@ def figure_stacked(sd, cols=(0, 1, 2), frac=0.75, panel_in=1.15):
 
 #figure([FIG_SEEDS[1]], 'seed1')      # single seed, for the mechanism argument
 #figure(FIG_SEEDS, 'allseeds')        # the plotted seeds, for the common-onset comparison
-figure_stacked(SEEDS[1], cols=(0, 1))       # thesis figure with error/spread in the appendix
+figure_stacked(FIG_SEEDS[1], cols=(0, 1))   # thesis figure with error/spread in the appendix
 
 # --- summary: do the seeds fail at the same cycle? (shared-observation set) ---
 print(f"\nalpha={ALPHA}  fold at x={FOLD}  failure = err > {FAIL_FRAC}*clim for {HOLD} cycles")
@@ -266,8 +257,7 @@ onsets = [runs[sd]['onset'] for sd in STAT_SEEDS if runs[sd]['onset'] is not Non
 if len(onsets) > 1:
     print(f"\nonset spread across seeds: min={min(onsets)} max={max(onsets)} "
           f"range={max(onsets) - min(onsets)} cycles")
-    print("small range -> failure is driven by the trajectory/observations (common cause);"
-          " large range -> driven by each seed's own ensemble draw.")
+
 elif len(onsets) == 1:
     print("\nonly one seed sustained failure — not a common-cycle failure.")
 else:
@@ -288,11 +278,7 @@ for sd in STAT_SEEDS:
     print(textwrap.fill(', '.join(f'{t_obs[i]:.2f}' for i in k),
                         width=96, initial_indent=' ' * 6, subsequent_indent=' ' * 6))
 
-
-
-# ============================================================
-# SAVE
-# ============================================================
+# --- save ---
 per = lambda key, src: np.array([src[sd][key] for sd in STAT_SEEDS], dtype=float)
 series = lambda key, src: np.array([src[sd][key] for sd in STAT_SEEDS])
 

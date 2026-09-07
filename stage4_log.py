@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.18 Changed: analysis RMSE is per-component-then-averaged via rls_core.rmse_percomp,
@@ -54,7 +52,6 @@ noise = {s: np.random.default_rng(s).normal(0, 1, (len(obs_idx), 3)) for s in SE
 
 
 def calibrate(run_fn, obs, h, ostd, seed):
-
     best_cal, best_any = None, None
     for m in jitter_mults:
         cfg.perturb_std = base * m               # (3,) trial jitter
@@ -65,9 +62,10 @@ def calibrate(run_fn, obs, h, ostd, seed):
         r = np.sqrt(out['sqerror'].mean(0))      # (3,) per-axis RMSE at this jitter
         sp = np.sqrt(out['spread'].mean(0))      # (3,) per-axis spread
         rm = r.mean()                            # scalar mean RMSE
-        if not np.isfinite(rm):                  # diverged at this jitter; not a candidate.
-            continue                             # without this it sticks as best_any, since
-                                                 # every later `rm < nan` compares False
+        # a diverged multiplier is not a candidate: `rm < nan` is always False, so without
+        # this skip the first NaN would stick as best_any for the rest of the scan
+        if not np.isfinite(rm):
+            continue
         if best_any is None or rm < best_any[1]:
             best_any = (out, rm, m)
         if rm < 0.25 * clim:                     # tracking; eligible for calibration
@@ -100,13 +98,12 @@ for a in ALPHAS:
             xa_mean=en['en_mean'],                    # (n_cycles, 3) EnKF ANALYSIS mean (post-update)
             jensen=en['jensen'],                      # (n_cycles, 3) measured E[h(x)]-h(E[x])
             xpf_mean=pf['en_mean'],                   # (n_cycles, 3) PF posterior mean (teacher)
-            obs=obs,                                   # (n_cycles, 3) observations
+            obs=obs,                                  # (n_cycles, 3) observations
             truth_at_obs=truth_at_obs,                # (n_cycles, 3) true state at each cycle
             times=times, alpha=a, seed=s, en_mult=en_mult, pf_mult=pf_mult,
         )
-        # sqerror is already squared error against truth; root per component, then average
-        rmse_en = float(np.sqrt(en['sqerror'].mean(0)).mean())
-        rmse_pf = float(np.sqrt(pf['sqerror'].mean(0)).mean())
+        rmse_en = rmse_percomp(en['en_mean'], truth_at_obs)
+        rmse_pf = rmse_percomp(pf['en_mean'], truth_at_obs)
         print(f'alpha={a}  seed={s}  RMSE enkf={rmse_en:.3f} pf={rmse_pf:.3f} '
               f'excess={(rmse_en - rmse_pf) / rmse_pf * 100:5.1f}%  -> {out}')
 

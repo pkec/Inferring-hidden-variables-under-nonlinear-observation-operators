@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.23 Fixed: EVERY ensemble size produced identical results. run_enkf_qr's signature is
@@ -13,17 +11,9 @@
 # ============================================================
 
 import os
-import inspect
 import numpy as np
 from config import cfg
 from enkf_qr import run_enkf_qr
-
-# Does run_enkf_qr take an explicit N? If it does, that is the only reliable way to set the
-# ensemble size: a `N=cfg.ensembleN` default is bound at import, so mutating cfg afterwards
-# never reaches it. If it does NOT, the size must come from cfg read inside the body, and
-# setting cfg.ensembleN does work. Either way the member-count assertion below is the check
-# that this actually took effect.
-QR_TAKES_N = 'N' in inspect.signature(run_enkf_qr).parameters
 
 ALPHA = float(os.environ.get('L63_EXT_ALPHA', 0.1))
 SIZES = [int(v) for v in os.environ.get('L63_EXT_N', '50,100,200,500,1000').split(',')]
@@ -60,8 +50,7 @@ rmse = np.full((K, S), np.nan)          # mean-over-components RMSE
 diverged = np.zeros((K, S), dtype=bool)
 
 base_N = cfg.ensembleN
-print(f'alpha={ALPHA:g}  window={W}  mode={MODE}  sizes={SIZES}  {S} runs each'
-      f'   (N passed explicitly: {QR_TAKES_N})')
+print(f'alpha={ALPHA:g}  window={W}  mode={MODE}  sizes={SIZES}  {S} runs each')
 
 for ki, N in enumerate(SIZES):
     # N is passed EXPLICITLY. run_enkf_qr declares `N=cfg.ensembleN`, and that default was
@@ -69,29 +58,16 @@ for ki, N in enumerate(SIZES):
     # it. cfg is still updated in case the filter reads it internally for anything else.
     cfg.ensembleN = N
     for si, s in enumerate(SEEDS):
-        kw = dict(seed=s, obs_std=ostd, save_forecast=True)
-        if QR_TAKES_N:
-            kw['N'] = N
-        out = run_enkf_qr(obs_of[s], truth, obs_idx, h, **kw)
-        if 'fc_history' not in out:
-            cfg.ensembleN = base_N
-            raise SystemExit(
-                "run_enkf_qr did not return 'fc_history'. The extrapolation test needs the "
-                "FORECAST ensemble at every cycle to build the min-max envelope of h. Add to "
-                "enkf_qr.py the same save_forecast handling enkf_ienkf.py already has: collect "
-                "the forecast ensemble each cycle into an (n_cycles, N, 3) array and return it "
-                "as out['fc_history'].")
+        out = run_enkf_qr(obs_of[s], truth, obs_idx, h,
+                          N=N, seed=s, obs_std=ostd, save_forecast=True)
 
         fc = out['fc_history']                         # (n_cycles, N, 3) forecast members
         if fc.shape[1] != N:                           # the 5.23 bug, caught rather than plotted
             cfg.ensembleN = base_N
             raise SystemExit(
                 f'asked for N_e={N} but the forecast ensemble has {fc.shape[1]} members, so '
-                f'every ensemble size would produce the same numbers.\n'
-                f'run_enkf_qr {"takes" if QR_TAKES_N else "does NOT take"} an N argument. '
-                f'If it does not, give it one (or have it read cfg.ensembleN inside the body '
-                f'rather than as a default argument) — a `N=cfg.ensembleN` default is bound '
-                f'once at import and never sees a later change to cfg.')
+                f'every ensemble size would produce the same numbers. A `N=cfg.ensembleN` '
+                f'default is bound once at import and never sees a later change to cfg.')
         Y = h(fc)                                      # (n_cycles, N, 3) predicted observations
         lo, hi = Y.min(axis=1), Y.max(axis=1)          # (n_cycles, 3) min-max envelope over members
         d = obs_of[s]                                  # (n_cycles, 3) observations

@@ -1,4 +1,3 @@
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.45 Changed: thesis_trace_pair() drops the per-panel alpha titles and moves the legend
@@ -121,13 +120,15 @@ S4 = 'figs/diagnostic/s4'                            # keeps the many per-run PN
 LABELS = ['$x_1$', '$x_2$', '$x_3$']
 fs.use()
 AX, FS = fs.AX, fs.FS     # sizes come from figstyle; do not re-assert them here
-TRACE_COMP = 0            # component shown in the residual trace (0=x). The fold in
-                          # h_alpha lives in x, so x is the informative one by default.
-TMAX = 300              # physical time cut for the per-cycle traces. Each seed's time axis
-                          # restarts at 0, so this halves every seed rather than dropping any.
-                          # None = plot the whole run.
-THESIS_TMAX = 60.0       # time cut for the residual-trace panel only. TMAX=150 is ~1000
-                         # cycles, which at 8.2cm wide reads as a band rather than a shape.
+# component shown in the residual trace (0=x). The fold in h_alpha lives in x, so x is the
+# informative one by default.
+TRACE_COMP = 0
+# physical time cut for the per-cycle traces. Each seed's time axis restarts at 0, so this
+# halves every seed rather than dropping any. None = plot the whole run.
+TMAX = 300
+# time cut for the residual-trace panel only; the full TMAX window at 8.2cm wide reads as a
+# band rather than a shape.
+THESIS_TMAX = 60.0
 THESIS_SEED = 0          # seed shown in the body; the rest stay in the per-seed PNGs
 TRACE_PAIR_ALPHAS = (0.0, 0.8)   # the two alphas shown side by side in thesis_trace_pair()
 RESID_PAIR_ALPHA = 0.8           # the fixed alpha for thesis_rls_resid_pair()
@@ -138,6 +139,7 @@ MODE_COLOUR = {'shadow': "#0bcd2c", 'inject': "#b73dcf",
 BASE, PFC, TRUEC = '#c0392b', '#16a085', '#333333'
 # (innov is still saved in the schema; the trace no longer overlays it — see 4.35)
 MODE_ORDER = ['shadow', 'inject', 'blind_shadow', 'blind_inject']
+
 # ---- discover every result file: data/stage4_{mode}_a{alpha}.npz ----
 # Modes the current pipeline produces. Anything else on disk is almost certainly a result
 # file left over from an earlier configuration — it still parses and would be plotted
@@ -173,21 +175,18 @@ modes = [m for m in MODE_ORDER if m in modes_found]
 alphas_all = sorted({r['alpha'] for r in runs})
 print(f'found modes {modes} at alphas {alphas_all}')
 if stale:
-    print('\n' + '!' * 78)
-    print('WARNING: result files with unrecognised modes are being plotted. These are')
-    print(f'probably stale, written under an older configuration. Expected: {sorted(KNOWN_MODES)}')
-    for p_ in stale:
-        print(f'  {p_}')
-    print('Delete them and rerun the learners, or they will be compared against current runs')
-    print('as if they were produced the same way.')
-    print('!' * 78 + '\n')
+    print(f'\nWARNING: result files with unrecognised modes are being plotted. These are\n'
+          f'probably stale, written under an older configuration. Expected: '
+          f'{sorted(KNOWN_MODES)}\n'
+          + ''.join(f'  {p_}\n' for p_ in stale)
+          + 'Delete them and rerun the learners, or they will be compared against current\n'
+            'runs as if they were produced the same way.\n')
 
 col = lambda mode: MODE_COLOUR.get(mode, None)          # None -> matplotlib default cycle
 rmse = rmse_percomp        # per component, then averaged over x, y, z (5.18)
 
 
 def legend_above_fig(fig, ax_src, ncol=2):
-
     h, l = ax_src.get_legend_handles_labels()
     kw = dict(fs.leg_above(ncol=ncol))
     for k in ('loc', 'bbox_to_anchor', 'bbox_transform', 'ncol'):
@@ -196,7 +195,6 @@ def legend_above_fig(fig, ax_src, ncol=2):
 
 
 def thesis_trace(mode, alpha, t, target, pred, row_seed, seed, legend=True):
-
     if row_seed is None:
         return
     sel = np.where(row_seed == seed)[0]
@@ -226,7 +224,6 @@ def thesis_trace(mode, alpha, t, target, pred, row_seed, seed, legend=True):
 
 
 def thesis_rls_resid(mode, alpha, t, resid, row_seed, seed, tmax=TMAX):
-
     sel = np.arange(len(t)) if row_seed is None else np.where(row_seed == seed)[0]
     if len(sel) < 2:
         return
@@ -248,7 +245,6 @@ def thesis_rls_resid(mode, alpha, t, resid, row_seed, seed, tmax=TMAX):
 
 
 def thesis_trace_pair(mode, alphas, by_ma, seed=THESIS_SEED, tmax=THESIS_TMAX):
-
     panels = []
     for alpha in alphas:
         r = by_ma.get((mode, alpha))
@@ -294,7 +290,6 @@ def thesis_trace_pair(mode, alphas, by_ma, seed=THESIS_SEED, tmax=THESIS_TMAX):
 
 
 def thesis_rls_resid_pair(alpha, modes_, by_ma, seed=THESIS_SEED, tmax=TMAX):
-
     panels = []
     for mode in modes_:
         r = by_ma.get((mode, alpha))
@@ -334,7 +329,8 @@ def thesis_rls_resid_pair(alpha, modes_, by_ma, seed=THESIS_SEED, tmax=TMAX):
     tag = '_'.join(modes_)
     fs.save(fig, f'figs/results/stage4_rls_resid_pair_{tag}_a{alpha}_s{seed}_thesis.png')
 
-# ================= per-run, per-cycle figures =================
+
+# --- per-run, per-cycle figures ---
 for r in runs:
     d, mode, alpha = r['d'], r['mode'], r['alpha']
     t = d['times']                                        # (T,) physical time
@@ -386,7 +382,7 @@ for r in runs:
     axes[0].legend(loc='upper right', ncol=2, **fs.LEG)
     fig.tight_layout()
     out = f'{S4}/stage4_residual_trace_{mode}_a{alpha}.png'
-    fig.savefig(out, dpi=140, bbox_inches='tight'); plt.close(fig); print(f'saved {out}')
+    fig.savefig(out, dpi=fs.DPI, bbox_inches='tight'); plt.close(fig); print(f'saved {out}')
 
     for (sd, _), (figx, axs) in zip(groups, singles):   # figx, not fs — fs is figstyle
         axs.legend(loc='upper right', ncol=2, **fs.LEG)
@@ -423,7 +419,7 @@ for r in runs:
     thesis_rls_resid(mode, alpha, t, resid, row_seed, THESIS_SEED)
 
 
-# ================= combined thesis trace-pair figure =================
+# --- combined thesis trace-pair figure ---
 # One merged PNG per mode with two alphas (default 0.0 and 0.8) side by side — the figure
 # claude/page_cuts_exact.md B3 asks for in place of a stacked or LaTeX-stitched pair.
 by_ma = {(r['mode'], r['alpha']): r for r in runs}
@@ -432,7 +428,7 @@ for m in modes:
 thesis_rls_resid_pair(RESID_PAIR_ALPHA, RESID_PAIR_MODES, by_ma, THESIS_SEED)
 
 
-# ================= across-alpha sweeps =================
+# --- across-alpha sweeps ---
 # Baseline and PF are stored PER MODE, not per alpha. Every mode now scores on cfg.seeds —
 # rls_blind.py trains on cfg.blind_seeds but sets TEST_SEEDS = cfg.seeds — so all four
 # baselines should be the same runs and the per-mode keying is redundant on current data.
@@ -447,7 +443,6 @@ for r in runs:
     pf_rmse[m][a] = rmse(d['xpf_mean'], d['truth'])
     corr_rmse[m][a] = rmse(d['xa_corr'], d['truth'])
 
-A = np.array(alphas_all)
 excess = lambda r_c, r_p: (r_c - r_p) / r_p * 100         # % excess over the PF floor
 
 
@@ -468,7 +463,8 @@ for m in modes:
     xa = sorted(corr_rmse[m])
     be = np.array([excess(base_rmse[m][a], pf_rmse[m][a]) for a in xa])
     ce = np.array([excess(corr_rmse[m][a], pf_rmse[m][a]) for a in xa])
-    ax.plot(xa, be - ce, 'o-', color=col(m), lw=1.8, ms=4, label=LEGEND_LABELS.get(m, m.replace('_', ' ')))
+    ax.plot(xa, be - ce, 'o-', color=col(m), lw=1.8, ms=4,
+            label=LEGEND_LABELS.get(m, m.replace('_', ' ')))
 
 ax.axhline(0, ls='--', color='#777', lw=1.2)  # 0 = correction changed nothing
 ax.set_xlabel(r'$\alpha$', fontname=AX, fontsize=FS)

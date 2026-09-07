@@ -1,4 +1,3 @@
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.18 Added: rmse_percomp() — the ONE definition of analysis RMSE for Stages 4 and 5: per
@@ -36,7 +35,6 @@ import numpy as np
 
 
 def rmse_percomp(a, b, nan=False):
-
     se = (np.asarray(a) - np.asarray(b)) ** 2                    # (T, 3) squared error
     per = np.sqrt(np.nanmean(se, axis=0) if nan else se.mean(axis=0))   # (3,) per-component
     return float(np.nanmean(per) if nan else per.mean())
@@ -58,14 +56,12 @@ N_DYN = 4 if USE_DYN else 0     # dynamic features appended per cycle
 
 
 def dyn_row(lag_pred, t, T):
-
     if not USE_DYN:
         return np.empty(0)                       # disabled: contributes nothing to the vector
     return np.concatenate([lag_pred, [t / max(T - 1, 1)]])
 
 
 def build_features(d, s2, xf_mean, delta, lag_d, lag_xf=None, use_delta=False):
-
     blocks = [d, s2, xf_mean, d**2, d * delta, lag_d]
     if lag_xf is not None and USE_LAG_XF:
         blocks.append(lag_xf)
@@ -75,7 +71,6 @@ def build_features(d, s2, xf_mean, delta, lag_d, lag_xf=None, use_delta=False):
 
 
 def n_features(n_raw_cols):
-
     return n_raw_cols + N_DYN + 1
 
 
@@ -88,7 +83,6 @@ class RunningStandardiser:
         self.M2 = np.zeros(n_raw_cols)               # running sum of squared devs; (k-1,)
 
     def transform(self, u_row, update=True):
-
         if update:
             self.n += 1
             dev = u_row - self.mean                  # deviation before mean update; (k-1,)
@@ -100,9 +94,7 @@ class RunningStandardiser:
 
 
 def load_log(path, alpha, use_delta=False):
-
-    import numpy as _np
-    d = _np.load(path)
+    d = np.load(path)
     h = lambda x: x + alpha * x ** 2               # observation operator for this alpha
     fc = d['fc_enkf']                              # (T, N, 3) forecast ensemble per cycle
     xa_mean = d['xa_mean']                         # (T, 3) analysis mean
@@ -114,8 +106,8 @@ def load_log(path, alpha, use_delta=False):
     s2 = fc.var(1, ddof=1)                         # (T, 3) forecast variance
     dd = obs - hbar                                # (T, 3) mean innovation
     delta = d['jensen']                            # (T, 3) measured Jensen bias
-    lag_d = _np.vstack([_np.zeros((1, 3)), dd[:-1]])        # (T, 3) previous innovation, row 0 padded
-    lag_xf = _np.vstack([_np.zeros((1, 3)), xf_mean[:-1]])  # (T, 3) previous forecast mean, row 0 padded
+    lag_d = np.vstack([np.zeros((1, 3)), dd[:-1]])        # (T, 3) previous innovation, row 0 padded
+    lag_xf = np.vstack([np.zeros((1, 3)), xf_mean[:-1]])  # (T, 3) previous forecast mean, row 0 padded
 
     return dict(
         U_raw=build_features(dd, s2, xf_mean, delta, lag_d, lag_xf=lag_xf, use_delta=use_delta),
@@ -125,9 +117,7 @@ def load_log(path, alpha, use_delta=False):
 
 
 def tail_mean_weights(w_hist, frac=0.5):
-
-    import numpy as _np
-    ok = _np.isfinite(w_hist).all(axis=(1, 2))       # (T,) rows actually written
+    ok = np.isfinite(w_hist).all(axis=(1, 2))        # (T,) rows actually written
     if not ok.any():
         raise ValueError('weight trajectory is entirely non-finite; the run diverged '
                          'immediately, so there is no model to freeze.')
@@ -137,20 +127,16 @@ def tail_mean_weights(w_hist, frac=0.5):
 
 
 def save_weights(alpha, w, std, seeds, lam, mode='shadow', path=None):
-
-    import numpy as _np
     out = path or f'data/stage4_weights_{mode}_a{alpha}.npz'
-    _np.savez(out, w=w, alpha=alpha, lam=lam, seeds=_np.array(seeds),
-              std_n=std.n, std_mean=std.mean, std_M2=std.M2,
-              n_static=len(std.mean) - N_DYN, K=w.shape[0], mode=mode,
-              use_lag_xf=USE_LAG_XF, use_dyn=USE_DYN)
+    np.savez(out, w=w, alpha=alpha, lam=lam, seeds=np.array(seeds),
+             std_n=std.n, std_mean=std.mean, std_M2=std.M2,
+             n_static=len(std.mean) - N_DYN, K=w.shape[0], mode=mode,
+             use_lag_xf=USE_LAG_XF, use_dyn=USE_DYN)
     return out
 
 
 def load_weights(alpha, mode='shadow', path=None):
-
-    import numpy as _np
-    d = _np.load(path or f'data/stage4_weights_{mode}_a{alpha}.npz')
+    d = np.load(path or f'data/stage4_weights_{mode}_a{alpha}.npz')
     if bool(d['use_lag_xf']) != USE_LAG_XF or bool(d['use_dyn']) != USE_DYN:
         raise ValueError(
             f"feature-set mismatch: weights were trained with USE_LAG_XF={bool(d['use_lag_xf'])}, "
@@ -166,20 +152,17 @@ def load_weights(alpha, mode='shadow', path=None):
 def save_stage4(mode, alpha, times, pred, target, rls_resid,
                 xa_corr, xa_base, xpf_mean, truth, w_hist, sqerror_corr, innov=None,
                 row_seed=None):
-
-    import numpy as _np
     out = f'data/stage4_{mode}_a{alpha}.npz'
-    _np.savez(out, mode=mode, alpha=alpha, times=times,
-              pred=pred, target=target, rls_resid=rls_resid,
-              xa_corr=xa_corr, xa_base=xa_base, xpf_mean=xpf_mean, truth=truth,
-              w_hist=w_hist, sqerror_corr=sqerror_corr,
-              **({} if innov is None else dict(innov=innov)),
-              **({} if row_seed is None else dict(row_seed=_np.asarray(row_seed))))
+    np.savez(out, mode=mode, alpha=alpha, times=times,
+             pred=pred, target=target, rls_resid=rls_resid,
+             xa_corr=xa_corr, xa_base=xa_base, xpf_mean=xpf_mean, truth=truth,
+             w_hist=w_hist, sqerror_corr=sqerror_corr,
+             **({} if innov is None else dict(innov=innov)),
+             **({} if row_seed is None else dict(row_seed=np.asarray(row_seed))))
     return out
 
 
 class RLS:
-
 
     def __init__(self, K, lam=1.0, P0=1e3, p_max=1e8):
         self.w = np.zeros((K, 3))                    # weights; column c maps features -> r component c

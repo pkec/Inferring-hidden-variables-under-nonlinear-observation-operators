@@ -1,9 +1,8 @@
-
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import numpy as np
 import matplotlib.pyplot as plt
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import figstyle as fs
 if getattr(fs, 'VERSION', (0, 0)) < (5, 32):      # stale copy on the path?
     raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
@@ -49,7 +48,6 @@ os.makedirs('figs/diagnostic', exist_ok=True)
 ALPHAS = [0.0, 1.0]
 FILTERS = [('EnKF', EnKF, '#c0392b'), ('IEnKF', EnKF_ienkf, '#2471a3')]
 fs.use()
-AX, FS = fs.AX, fs.FS       # sizes come from figstyle; do not re-assert them here
 FRAC = 0.48                 # two panels across the text width
 
 # ---- label / legend sizing ---------------------------------------------------------------
@@ -59,29 +57,18 @@ FRAC = 0.48                 # two panels across the text width
 # Set it to 1.0 to go back to plain figstyle sizes (9pt/8pt/7.5pt on the page).
 LABEL_SCALE = 1.25
 
-def scaled(kw, s=None):
-
-    s = LABEL_SCALE if s is None else s
+def scaled(kw, s=LABEL_SCALE):
     out = dict(kw)
-    for k in ('fontsize', 'size'):
-        if isinstance(out.get(k), (int, float)):
-            out[k] = out[k] * s
-    p = out.get('prop')
-    if isinstance(p, dict):
-        q = dict(p)
-        if isinstance(q.get('size'), (int, float)):
-            q['size'] = q['size'] * s
-        out['prop'] = q
-    elif p is not None and hasattr(p, 'get_size'):        # a FontProperties instance
-        q = p.copy(); q.set_size(p.get_size() * s); out['prop'] = q
+    if 'fontsize' in out:                                 # fs.LAB
+        out['fontsize'] = out['fontsize'] * s
+    if 'prop' in out:                                     # fs.LEG, via fs.leg_above
+        out['prop'] = dict(out['prop'], size=out['prop']['size'] * s)
     return out
 
 LAB = scaled(fs.LAB)
-_tk = plt.rcParams['xtick.labelsize']                     # figstyle sets this in fs.use()
-TICKSIZE = (_tk if isinstance(_tk, (int, float)) else 8) * LABEL_SCALE
+TICKSIZE = fs.TICK * LABEL_SCALE
 
 def legend_above_fig(fig, ax_src, ncol):
-
     h, l = ax_src.get_legend_handles_labels()
     kw = scaled(fs.leg_above(ncol=ncol))
     for k in ('loc', 'bbox_to_anchor', 'bbox_transform', 'ncol'):   # re-anchored in fig coords
@@ -94,7 +81,6 @@ on, osa, al = d['obs_nonlinear'], d['obs_std_alpha'], list(np.round(d['alphas'],
 t = oi * cfg.dt
 
 def run(anafn, a):
-
     ai = al.index(round(a, 2))
     obs, ostd = on[ai], osa[ai]
     R = np.diag(ostd ** 2)
@@ -108,12 +94,11 @@ def run(anafn, a):
             ens = rk4_vec(ens, cfg.dt)
         ens, _, _ = anafn(ens, obs[k], R, h, rng)
         m = ens.mean(0)
-        rmse[k]   = np.sqrt(((truth[oi[k]] - m) ** 2).mean())     # root-mean over 3 axes
-        spread[k] = np.sqrt((ens.std(0) ** 2).mean())
+        rmse[k]   = np.abs(truth[oi[k]] - m).mean()      # per component, then averaged over x, y, z
+        spread[k] = ens.std(0).mean()
     return rmse, spread
 
-# run every filter once and keep the series; both the split and the combined figures read
-# from this, so splitting costs no extra propagation
+# run every filter once and keep the series; the split and combined figures both read from this
 series = {(a, fname): run(fn, a) for a in ALPHAS for fname, fn, _ in FILTERS}
 
 # (row stem, y-label, index into run()'s (rmse, spread) return)
@@ -121,7 +106,6 @@ ROWS = [('spread', 'spread (per cycle)', 1),
         ('rmse',   'RMSE (per cycle)',   0)]
 
 def panel(ax, a, stem, ylab, vi):
-
     for fname, _, col in FILTERS:
         ax.plot(t, series[(a, fname)][vi], color=col, lw=0.8, label=fname)
     ax.set_ylabel(ylab, **LAB)
@@ -137,9 +121,7 @@ for a in ALPHAS:
         ax.legend(**scaled(fs.leg_above(ncol=len(FILTERS))))
         fs.save(fig, f'figs/diagnostic/ie_{stem}_a{a}_w{cfg.obs_every}.png')
 
-# per-alpha merged 1x2 — spread and RMSE SIDE BY SIDE at one alpha. This is the write-up
-# figure: one image with one caption replaces two subfigures with two subcaptions, and the
-# panels come out ~8.5cm wide instead of the 7.1cm two 0.42 subfigures allow.
+# per-alpha merged 1x2 — spread and RMSE side by side at one alpha; the write-up figure
 for a in ALPHAS:
     fig, axes = plt.subplots(1, 2, figsize=fs.size(1.0, 0.34))
     for i, (stem, ylab, vi) in enumerate(ROWS):

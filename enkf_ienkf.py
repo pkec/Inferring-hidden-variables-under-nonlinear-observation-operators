@@ -18,7 +18,6 @@ GN_EPS     = 1e-3    # bundle probe: anomalies shrunk by this before regressing 
 
 
 def EnKF_ienkf(Af, d, Cdd, h, rng):
-
     Nm = Af.shape[0]
 
     psi_f_m = np.mean(Af, 0, keepdims=True)         # (1, n_state) = E[x]
@@ -37,9 +36,8 @@ def EnKF_ienkf(Af, d, Cdd, h, rng):
     x_f = psi_f_m[0]                                  # background mean; FIXED for every iteration
     Pf = (Xa.T @ Xa) / (Nm - 1)                       # background covariance; FIXED
     w = x_f.copy()                                    # current iterate of the analysis mean
-    H = None
     for _ in range(GN_MAXITER):
-        E = w + GN_EPS * Xa                           # probe cloud: prior anomalies, shrunk(Sakov's bundle), re-centred at w
+        E = w + GN_EPS * Xa                           # probe cloud: prior anomalies, shrunk (Sakov's bundle), re-centred at w
         Sb = h(E) - h(E).mean(0)                      # obs anomalies of the probe
         Eb = E - E.mean(0)                            # state anomalies of the probe (= GN_EPS * Xa)
         H = np.linalg.lstsq(Eb, Sb, rcond=None)[0].T  # (n_obs, n_state) tangent-linear by regression
@@ -56,7 +54,7 @@ def EnKF_ienkf(Af, d, Cdd, h, rng):
     # --- anomaly update: stochastic, reusing the perturbed obs (as enkf.py does) ---
     eps = D - d                                       # per-member obs-noise draws
     eps = eps - eps.mean(0)                           # centre them so the mean is untouched
-    Aa_anom = Xa - Xa @ (K @ H).T + eps @ K.T            # Cov -> (I-KH)Pf(I-KH)^T + K R K^T
+    Aa_anom = Xa - Xa @ (K @ H).T + eps @ K.T         # Cov -> (I-KH)Pf(I-KH)^T + K R K^T
     Aa = w + Aa_anom                                  # analysis = converged mean + updated anomalies
 
     if not np.isreal(Aa).all():
@@ -67,7 +65,6 @@ def EnKF_ienkf(Af, d, Cdd, h, rng):
 
 def run_enkf_ienkf(obs, truth, obs_idx, h, seed=cfg.seed, N=cfg.ensembleN,
                    obs_std=None, save_forecast=True):
-
     rng = np.random.default_rng(seed)              # fresh rng per run
     n_obs = len(obs)
     obs_std = cfg.obs_std if obs_std is None else obs_std

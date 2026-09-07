@@ -1,16 +1,13 @@
-
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import numpy as np
 import matplotlib.pyplot as plt
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import figstyle as fs
-if getattr(fs, 'VERSION', (0, 0)) < (5, 29):      # stale copy on the path?
+if getattr(fs, 'VERSION', (0, 0)) < (5, 32):      # stale copy on the path?
     raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
                      f'the current version and delete any __pycache__ beside it')
 from config import cfg, PERTURB_BASELINE_ALPHA
-
-fs.use()
 
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
@@ -48,39 +45,33 @@ fs.use()
 # 2.2  created — calibrated jitter vs alpha, with boundary-hit flags
 # ============================================================
 
-# must match the grid used in stage2.py
+fs.use()
+
+# must match the grid scanned in error_sweep.py
 GRID = np.geomspace(0.3, 30, 9)
 FLOOR, CEIL = GRID[0], GRID[-1]
 W = cfg.obs_every                                    # window set by run.py (L63_OBS_EVERY)
-SHOW_ERRORBARS = False                                # +/-1 std across seeds on each pick
+SHOW_ERRORBARS = False                               # +/-1 std across seeds on each pick
 
 LABEL_SCALE = 1.25
 
-def scaled(kw, s=None):
-    s = LABEL_SCALE if s is None else s
+def scaled(kw, s=LABEL_SCALE):
     out = dict(kw)
-    for k in ('fontsize', 'size'):
-        if isinstance(out.get(k), (int, float)):
-            out[k] = out[k] * s
-    p = out.get('prop')
-    if isinstance(p, dict):
-        q = dict(p)
-        if isinstance(q.get('size'), (int, float)):
-            q['size'] = q['size'] * s
-        out['prop'] = q
-    elif p is not None and hasattr(p, 'get_size'):        # a FontProperties instance
-        q = p.copy(); q.set_size(p.get_size() * s); out['prop'] = q
+    if 'fontsize' in out:                                 # fs.LAB, fs.ANN
+        out['fontsize'] = out['fontsize'] * s
+    if 'prop' in out:                                     # fs.LEG, via fs.leg_above
+        out['prop'] = dict(out['prop'], size=out['prop']['size'] * s)
     return out
 
 LAB = scaled(fs.LAB)
-ANN = scaled(getattr(fs, 'ANN', {'fontsize': 7.5}))       # the grid floor/ceiling notes
-_tk = plt.rcParams['xtick.labelsize']                     # figstyle sets this in fs.use()
-TICKSIZE = (_tk if isinstance(_tk, (int, float)) else 8) * LABEL_SCALE
+ANN = scaled(fs.ANN)                                      # the grid floor/ceiling notes
+TICKSIZE = fs.TICK * LABEL_SCALE
 
 os.makedirs('figs/diagnostic', exist_ok=True)
 modes = [m for m in ('fixed_R', 'fixed_snr') if os.path.exists(f'data/stage2_results_w{W}_{m}_variable.npz')]
 if not modes:
-    raise SystemExit(f'no data/stage2_results_w{W}_*_variable.npz found — run stage2.py (variable) first')
+    raise SystemExit(f'no data/stage2_results_w{W}_*_variable.npz found — '
+                     f'run error_sweep.py (variable) first')
 
 EN, PF = '#c0392b', '#2471a3'
 # one mode -> the model figure's own geometry; two -> full width, one shared legend above.

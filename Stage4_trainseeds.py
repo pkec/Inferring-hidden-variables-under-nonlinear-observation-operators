@@ -1,4 +1,3 @@
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 #      Added: merged 1x2 with (a)/(b) drawn in, sharing the y axis. The shared range was
@@ -48,7 +47,6 @@ P0 = 1e3
 USE_DELTA = False
 SUBSETS = os.environ.get('L63_TS_SUBSETS', 'all')      # 'all' | 'prefix'
 
-AX, FS = fs.AX, fs.FS             # sizes come from figstyle
 SEED_COL = ['#2471a3', '#e67e22', '#16a085', '#8e44ad', '#c0392b']   # one per blind seed
 
 tw = np.load('data/l63_twin.npz')
@@ -149,6 +147,7 @@ YLIM = (min(lo - pad, -pad), hi + pad)                    # always show the zero
 
 x = np.arange(len(ALPHAS))
 width = 0.8 / max(len(TEST_SEEDS), 1)
+
 
 def bars(ax, k, legend):
     ax.axhline(0, color='#333', lw=1.2)                   # 0 = correction changed nothing

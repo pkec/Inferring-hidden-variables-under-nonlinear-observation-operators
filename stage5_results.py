@@ -1,4 +1,3 @@
-
 import os
 import re
 import glob
@@ -51,7 +50,6 @@ from rls_core import rmse_percomp
 os.makedirs('figs/results', exist_ok=True)
 ALPHA = float(os.environ.get('L63_COST_ALPHA', 0.6))
 fs.use()
-AX, FS = fs.AX, fs.FS                                   # sizes come from figstyle
 FRAC = 0.72                                             # \includegraphics width in the thesis
 
 # ---------------- parameters (Table tab:params) ----------------
@@ -64,7 +62,7 @@ n_c = len(np.arange(cfg.obs_every, cfg.n_steps + 1, cfg.obs_every))   # assimila
 N_e = cfg.ensembleN                                     # EnKF-family members
 N_pf = cfg.particleN                                    # particles
 m_q = 2 * p + 1                                         # QR-EnKF design-matrix columns [1, y, y^2]
-K = 7 * n + 5                                           # RLS feature count (rls_core.n_features)
+K = 8 * n + 2                                           # RLS feature count (rls_core.n_features)
 n_it = float(os.environ.get('L63_N_IT', 3))             # mean Gauss-Newton iterations (cap 20)
 n_tr = int(os.environ.get('L63_N_TR', 3))               # training runs charged to the blind modes
 r = int(os.environ.get('L63_R', 3))                     # deployment runs priced by C(r)
@@ -127,12 +125,12 @@ for lbl, Nd, sym, sub, ca, C0sym, C0, _ in FILTERS:
 
 # Break-even run counts. Blind pays n_tr training runs up front to deploy without the PF;
 # these are the r at which that trade turns positive against the two things it replaces.
+# n_c cancels: n_tr*n_c*ca_sh + r*n_c*ca_en = r*n_c*ca_rival  ->  r = n_tr*ca_sh/(ca_rival - ca_en)
 for rival, ca_rival in (('live shadow/inject', ca_sh), ('the PF', ca_pf)):
     gain = ca_rival - ca_en                    # flops per cycle saved by dropping the PF
     if gain > 0:
         print(f'break-even vs {rival}: r = n_tr*ca_sh/(ca_rival - ca_en) '
               f'= {n_tr * ca_sh / gain:.1f} runs')
-
 
 rmse_of, provenance = {}, {}
 ref = {}                                                   # shared EnKF baseline and PF floor
@@ -225,7 +223,6 @@ for i in order:
     level = (level + 1) % 2 if close else 0
     dy[i] = 6 + 1 * level
     prev = xs_log[i]
-
 
 place_left = {}
 for i in range(len(plotted)):

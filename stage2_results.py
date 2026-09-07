@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -54,14 +53,14 @@ os.makedirs('figs/results', exist_ok=True)
 W, mode, jit = cfg.obs_every, cfg.noise_mode, cfg.jitter_mode
 f = f'data/stage2_results_w{W}_{mode}_{jit}.npz'
 if not os.path.exists(f):
-    raise SystemExit(f'{f} not found — run stage2.py first')
+    raise SystemExit(f'{f} not found — run error_sweep.py first')
 
 EN, J, C = '#c0392b', '#c0392b', '#c0392b'
 fs.use()
 AX, FS = fs.AX, fs.FS       # sizes come from figstyle; do not re-assert them here
-FRAC, ASP = 0.32, fs.XY     # three panels across the text width.
-                            # For roomier panels use 0.48 / fs.WIDE — they then
-                            # wrap to two rows in LaTeX, costing ~0.29 page.
+# three panels across the text width. For roomier panels use 0.48 / fs.WIDE — they then
+# wrap to two rows in LaTeX, costing ~0.29 page.
+FRAC, ASP = 0.32, fs.XY
 COMP = [('x', '#8e44ad'), ('y', '#16a085'), ('z', '#e67e22')]
 d = np.load(f); a = d['alphas']
 sd = lambda k: d[k] if k in d.files else np.zeros_like(a)   # seed std, 0 on pre-2.14 files
@@ -75,11 +74,9 @@ sd = lambda k: d[k] if k in d.files else np.zeros_like(a)   # seed std, 0 on pre
 # quietly.
 CONV = str(d['rmse_convention']) if 'rmse_convention' in d.files else None
 if CONV is None:
-    print('!' * 78)
-    print(f'WARNING: {f} predates error_sweep.py 5.16 (no rmse_convention key).')
-    print('Its excess_pct is the POOLED RMSE ratio, NOT the per-component-then-averaged')
-    print('number the write-up quotes. Rerun error_sweep.py before using these figures.')
-    print('!' * 78)
+    print(f'WARNING: {f} predates error_sweep.py 5.16 (no rmse_convention key). Its\n'
+          f'excess_pct is the POOLED RMSE ratio, not the per-component-then-averaged number\n'
+          f'the write-up quotes. Rerun error_sweep.py before using these figures.')
 else:
     print(f'RMSE convention: {CONV}')
 
@@ -130,7 +127,7 @@ ax2.plot(a, d['crosscov_err'], 'o-', color=C, lw=2)
 ax2.fill_between(a, d['crosscov_err'] - sd('crosscov_err_std'),
                      d['crosscov_err'] + sd('crosscov_err_std'), color=C, alpha=0.2)
 ax2.set_xlabel(r'$\alpha$', fontname=AX, fontsize=FS)
-ax2.set_ylabel(r'$\mathcal{E}_{xh}$', fontname=AX, fontsize=FS)  
+ax2.set_ylabel(r'$\mathcal{E}_{xh}$', fontname=AX, fontsize=FS)
 ax2.grid(alpha=0.3)
 
 fig2.tight_layout()

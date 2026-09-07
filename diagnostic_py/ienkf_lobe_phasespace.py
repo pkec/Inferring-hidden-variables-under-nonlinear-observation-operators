@@ -1,5 +1,3 @@
-
-
 # ============================================================
 # CHANGELOG  (newest first; version = stage.patch)
 # 5.43 Fixed:   the legend sat top-left, on top of the (a) letter and on the left wing of the
@@ -25,11 +23,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # run from diagnostic_py/: put the project root on the import path
 import numpy as np
 import matplotlib.pyplot as plt
-from config import cfg, rk4
 import figstyle as fs
 if getattr(fs, 'VERSION', (0, 0)) < (5, 32):      # stale copy on the path?
     raise SystemExit(f'figstyle.py at {fs.__file__} is out of date — replace it with '
                      f'the current version and delete any __pycache__ beside it')
+from config import cfg, rk4
 from enkf_ienkf import run_enkf_ienkf
 
 os.makedirs('figs/results', exist_ok=True)
@@ -41,7 +39,7 @@ SEED = 1                       # the seed that sustains failure in stage3_ienkf_
 h_a = lambda x: x + ALPHA * x ** 2
 FOLD = -1.0 / (2 * ALPHA)
 FAIL_FRAC, HOLD = 0.25, 3      # failure criterion, matching stage3_ienkf_seeds.py
-WIN = 30                      # cycles either side of the onset to plot
+WIN = 30                       # cycles either side of the onset to plot
 TRU, IEC = '#333333', '#8e44ad'
 
 # --- truth and observations: same recipe as the sweep ---
@@ -61,7 +59,8 @@ obs = h_a(truth[obs_idx]) + np.random.default_rng(cfg.seed).normal(
 
 res = run_enkf_ienkf(obs, truth, obs_idx, h_a, seed=SEED, obs_std=obs_std)
 mean = res['en_mean']                                  # (n_obs, 3) IEnKF analysis mean
-err = np.sqrt(res['sqerror'].mean(1))                  # (n_obs,) per-cycle RMS error
+err = np.sqrt(res['sqerror']).mean(1)                  # (n_obs,) per component, then averaged
+spread = np.sqrt(res['spread']).mean(1)                # (n_obs,) same, from the variance
 tao = truth[obs_idx]
 
 # --- locate the sustained-failure onset, and a healthy stretch well clear of it ---
@@ -106,8 +105,6 @@ fig, axes = plt.subplots(1, 2, figsize=fs.size(1.0, 0.42), sharex=True, sharey=T
 for i, (sl, stem) in enumerate(PANES):
     draw(axes[i], sl, legend=False)      # both panes draw the same three lines
     fs.panel_letter(axes[i], i)          # no subcaptions on a merged figure to carry these
-    # the t-range and RMS error stay as panel titles here; on a merged write-up figure they
-    # are the only thing distinguishing the two windows, and the suptitle is dropped
     axes[i].set_title(f'$t$ = {t_obs[sl][0]:.1f}--{t_obs[sl][-1]:.1f}, '
                       f'RMS error {err[sl].mean():.2f}')
 axes[1].set_ylabel('')
@@ -118,7 +115,5 @@ fs.save(fig, f'figs/results/ienkf_lobe_phasespace_a{ALPHA}_w{cfg.obs_every}.png'
 
 print(f'\nonset cycle {onset} (t={t_obs[onset]:.2f}), failure = err > {FAIL_FRAC}*clim '
       f'for {HOLD} cycles')
-print(f'  healthy window  RMS error {err[good].mean():6.2f}   spread '
-      f'{np.sqrt(res["spread"].mean(1))[good].mean():.2f}')
-print(f'  failure window  RMS error {err[fail].mean():6.2f}   spread '
-      f'{np.sqrt(res["spread"].mean(1))[fail].mean():.2f}')
+print(f'  healthy window  RMS error {err[good].mean():6.2f}   spread {spread[good].mean():.2f}')
+print(f'  failure window  RMS error {err[fail].mean():6.2f}   spread {spread[fail].mean():.2f}')
