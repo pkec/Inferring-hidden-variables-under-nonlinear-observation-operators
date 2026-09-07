@@ -2,4 +2,4 @@ This is the code which was used for the Imperial MSc Advanced Aeronautical Engin
 
 Note that some scripts have been updated and some mistakes have been fixed for the final send; not all data has been regenerated so data folder may hold outdated files. 
 
-I acknowledge use of Claude AI which assisted in coding during the thesis.
+I acknowledge the use of Claude AI which assisted with coding during the thesis.
